@@ -15,8 +15,8 @@
       --text2:      #555570;
       --accent:     #4f46e5;
       --accent-dim: #e8e7ff;
-      --danger:     #dc2626;
-      --danger-dim: #fee2e2;
+      --amount:     #646476;
+      --amount-dim: #f0f0f2;
       --green:      #16a34a;
       --green-dim:  #dcfce7;
       --warn:       #d97706;
@@ -34,8 +34,8 @@
         --text2:      #8888a8;
         --accent:     #7c76f5;
         --accent-dim: #1e1b4b;
-        --danger:     #f87171;
-        --danger-dim: #2d1515;
+        --amount:     #8888a0;
+        --amount-dim: #22222e;
         --green:      #4ade80;
         --green-dim:  #052e16;
         --warn:       #fbbf24;
@@ -185,12 +185,24 @@
     #breadcrumb {
       display: flex;
       align-items: center;
-      gap: .4rem;
+      gap: .75rem;
       font-size: .82rem;
       color: var(--text2);
       margin-bottom: 1.25rem;
       flex-wrap: wrap;
     }
+    #breadcrumb .back-btn {
+      padding: 0;
+      border: none;
+      background: none;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 1.1rem;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+    #breadcrumb .back-btn:hover { opacity: .7; }
+    #breadcrumb .crumbs { display: flex; align-items: center; gap: .4rem; }
     #breadcrumb .crumb { color: var(--accent); cursor: pointer; }
     #breadcrumb .crumb:hover { text-decoration: underline; }
     #breadcrumb .crumb-sep { color: var(--border); }
@@ -200,7 +212,7 @@
     #period-total {
       font-size: 1.6rem;
       font-weight: 700;
-      color: var(--danger);
+      color: var(--amount);
       margin-bottom: 1.25rem;
     }
     #period-total .label {
@@ -240,7 +252,7 @@
     .category-card .cat-total {
       font-size: 1.15rem;
       font-weight: 700;
-      color: var(--danger);
+      color: var(--amount);
     }
     .category-card .cat-total.positive { color: var(--green); }
     .category-card .cat-count {
@@ -290,7 +302,7 @@
       flex-shrink: 0;
     }
     .merchant-row .m-count { font-size: .75rem; color: var(--text2); }
-    .merchant-row .m-total { font-weight: 700; color: var(--danger); font-size: .95rem; }
+    .merchant-row .m-total { font-weight: 700; color: var(--amount); font-size: .95rem; }
     .merchant-row .m-total.positive { color: var(--green); }
 
     /* ── Transactions table ─────────────────────────────────────── */
@@ -317,7 +329,7 @@
       vertical-align: middle;
     }
     tbody tr.is-refund { background: var(--green-dim); }
-    .amount-neg { color: var(--danger); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .amount-neg { color: var(--amount); font-weight: 600; font-variant-numeric: tabular-nums; }
     .amount-pos { color: var(--green); font-weight: 600; font-variant-numeric: tabular-nums; }
     .refund-badge {
       display: inline-block;
@@ -713,22 +725,20 @@ function renderMainPanel() {
 // ── Breadcrumb ──────────────────────────────────────────────────────
 function renderBreadcrumb() {
   const parts = [];
+  let backBtn = '';
 
   if (state.view === 'categories') {
     parts.push(`<span class="crumb-current">Categorias</span>`);
   } else if (state.view === 'merchants') {
-    parts.push(`<span class="crumb" onclick="goToCategories()">Categorias</span>`);
-    parts.push(`<span class="crumb-sep">›</span>`);
+    backBtn = `<button class="back-btn" onclick="goToCategories()" title="Voltar">←</button>`;
     parts.push(`<span class="crumb-current">${esc(state.activeCategory)}</span>`);
   } else {
-    parts.push(`<span class="crumb" onclick="goToCategories()">Categorias</span>`);
-    parts.push(`<span class="crumb-sep">›</span>`);
-    parts.push(`<span class="crumb" onclick="goToMerchants()">${esc(state.activeCategory)}</span>`);
-    parts.push(`<span class="crumb-sep">›</span>`);
+    backBtn = `<button class="back-btn" onclick="goToMerchants()" title="Voltar">←</button>`;
     parts.push(`<span class="crumb-current">${esc(state.activeMerchant)}</span>`);
   }
 
-  el('main-panel').innerHTML = `<div id="breadcrumb">${parts.join('')}</div><div id="view-content"></div>`;
+  const breadcrumbHtml = backBtn + `<div class="crumbs">${parts.join('')}</div>`;
+  el('main-panel').innerHTML = `<div id="breadcrumb">${breadcrumbHtml}</div><div id="view-content"></div>`;
 }
 
 function goToCategories() {
@@ -833,6 +843,7 @@ function renderTransactions() {
       <tr${rowClass}>
         <td class="tx-date">${formatDate(tx.date)}</td>
         <td>${esc(tx.description)}${refundBadge}</td>
+        <td style="color:var(--text2);font-size:.85rem"></td>
         <td style="text-align:right"><span class="${amtClass}">${formatEuro(tx.amount)}</span></td>
       </tr>`;
   }).join('');
@@ -852,11 +863,12 @@ function renderTransactions() {
         <thead>
           <tr>
             <th>Data</th>
+            <th>Transação</th>
             <th>Descrição</th>
             <th style="text-align:right">Valor</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="3" style="color:var(--text2);padding:.75rem">Sem transações.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="4" style="color:var(--text2);padding:.75rem">Sem transações.</td></tr>'}</tbody>
       </table>
     </div>`;
 }
