@@ -301,6 +301,18 @@
       gap: .75rem;
       flex-shrink: 0;
     }
+    .merchant-category-select {
+      padding: .35rem .5rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: .8rem;
+      cursor: pointer;
+      outline: none;
+    }
+    .merchant-category-select:hover { border-color: var(--accent); }
+    .merchant-category-select:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-dim); }
     .merchant-row .m-count { font-size: .75rem; color: var(--text2); }
     .merchant-row .m-total { font-weight: 700; color: var(--amount); font-size: .95rem; }
     .merchant-row .m-total.positive { color: var(--green); }
@@ -493,6 +505,7 @@
 // CONFIG — set GIST_ID after running the export script for the first time
 // ────────────────────────────────────────────────────────────────────
 const GIST_ID = '1315a80df7f46d8985fa3fa50548705f';
+const EDITS_GIST_ID = '565438afdc33a431fedd9067ea668c51';
 
 // ────────────────────────────────────────────────────────────────────
 // State
@@ -500,6 +513,7 @@ const GIST_ID = '1315a80df7f46d8985fa3fa50548705f';
 const state = {
   token: null,
   data: null,
+  edits: {},  // { "2026-01|Apple": "Subscrições", ... }
   activeMonth: 'Todos',
   view: 'categories',   // 'categories' | 'merchants' | 'transactions'
   activeCategory: null,
@@ -522,6 +536,43 @@ function formatDate(iso) {
 
 function formatMonth(key) {
   return state.data?.period?.month_labels?.[key] ?? key;
+}
+
+function getEditKey(month, merchant) {
+  return `${month}|${merchant}`;
+}
+
+function getCategoryForMerchant(month, merchant, originalCategory) {
+  const key = getEditKey(month, merchant);
+  return state.edits[key] ?? originalCategory;
+}
+
+async function saveEditToGist(month, merchant, newCategory) {
+  const key = getEditKey(month, merchant);
+  state.edits[key] = newCategory;
+
+  const payload = { edits: state.edits };
+  const headers = {
+    "Authorization": `token ${state.token}`,
+    "Accept": "application/vnd.github+json",
+  };
+
+  try {
+    const res = await fetch(`https://api.github.com/gists/${EDITS_GIST_ID}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({
+        files: {
+          "category_edits.json": {
+            content: JSON.stringify(payload, null, 2)
+          }
+        }
+      })
+    });
+    if (!res.ok) console.error("Failed to save edit:", res.status);
+  } catch (err) {
+    console.error("Error saving edit:", err);
+  }
 }
 
 function getMerchantWarning(merchantName) {
@@ -654,6 +705,27 @@ async function loadData() {
     }
 
     state.data = JSON.parse(fileContent);
+
+    // Load edits from the edits Gist
+    try {
+      const editsRes = await fetch(`https://api.github.com/gists/${EDITS_GIST_ID}`, {
+        headers: {
+          'Authorization': `token ${state.token}`,
+          'Accept': 'application/vnd.github+json',
+        }
+      });
+      if (editsRes.ok) {
+        const editsGist = await editsRes.json();
+        const editsContent = editsGist.files?.['category_edits.json']?.content;
+        if (editsContent) {
+          const editsData = JSON.parse(editsContent);
+          state.edits = editsData.edits ?? {};
+        }
+      }
+    } catch (err) {
+      console.warn("Could not load edits Gist:", err.message);
+    }
+
     state.activeMonth = 'Todos';
     state.view = 'categories';
     state.activeCategory = null;
@@ -795,6 +867,7 @@ function openCategory(cat) {
 // ── Merchants ────────────────────────────────────────────────────────
 function renderMerchants() {
   const merchants = state.data?.merchant_totals?.[state.activeMonth]?.[state.activeCategory] ?? [];
+  const allCategories = Object.keys(state.data?.category_totals?.['Todos'] ?? {}).sort();
 
   const rows = merchants.map(m => {
     const warning = getMerchantWarning(m.merchant);
@@ -802,13 +875,30 @@ function renderMerchants() {
       ? `<span class="warn-badge" onmouseenter="showTooltip('${esc(warning)}', event)" onmouseleave="hideTooltip()">⚠️</span>`
       : '';
     const totalClass = m.total >= 0 ? 'positive' : '';
+
+    // Get the effective category (edited or original)
+    const editKey = getEditKey(state.activeMonth, m.merchant);
+    const effectiveCategory = state.edits[editKey] ?? state.activeCategory;
+    const isEdited = state.edits[editKey] !== undefined;
+    const editedBadge = isEdited ? ' <span style="font-size:.7rem; color:var(--accent)">●</span>' : '';
+
+    const categoryOptions = allCategories.map(cat =>
+      `<option value="${cat}" ${effectiveCategory === cat ? 'selected' : ''}>${esc(cat)}</option>`
+    ).join('');
+
     return `
-      <div class="merchant-row" onclick="openMerchant('${esc(m.merchant)}')">
-        <div class="m-name">${warnBadge}<span>${esc(m.merchant)}</span></div>
-        <div class="m-right">
+      <div class="merchant-row">
+        <div class="m-name" onclick="openMerchant('${esc(m.merchant)}')">
+          ${warnBadge}<span>${esc(m.merchant)}</span>
+        </div>
+        <div class="m-right" style="gap: 1rem;">
+          <select class="merchant-category-select" onchange="changeMerchantCategory('${esc(m.merchant)}', this.value)" onclick="event.stopPropagation()">
+            ${categoryOptions}
+          </select>
           <span class="m-count">${m.tx_count}×</span>
           <span class="m-total ${totalClass}">${formatEuro(m.total)}</span>
         </div>
+        <div style="font-size:.8rem; color:var(--text2); min-width:3rem; text-align:right;">${editedBadge}</div>
       </div>`;
   }).join('');
 
@@ -816,6 +906,18 @@ function renderMerchants() {
   view.innerHTML = `
     <div class="list-header">${esc(state.activeCategory)} — ${state.activeMonth === 'Todos' ? 'todos os meses' : formatMonth(state.activeMonth)}</div>
     <div class="merchant-list">${rows || '<p style="color:var(--text2);padding:.5rem 0">Sem transações.</p>'}</div>`;
+}
+
+function changeMerchantCategory(merchant, newCategory) {
+  // Only allow editing if not in 'Todos' view
+  if (state.activeMonth === 'Todos') {
+    alert('Selecciona um mês específico para editar categorias.');
+    renderMerchants();
+    return;
+  }
+  saveEditToGist(state.activeMonth, merchant, newCategory);
+  // Re-render to show the edited badge
+  renderMerchants();
 }
 
 function openMerchant(merchant) {
