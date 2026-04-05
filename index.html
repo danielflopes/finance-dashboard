@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finanças</title>
+  <style>
+    /* ── Palette ───────────────────────────────────────────────── */
+    :root {
+      --bg:         #f5f5f7;
+      --surface:    #ffffff;
+      --surface2:   #f0f0f2;
+      --border:     #e0e0e5;
+      --text:       #1a1a2e;
+      --text2:      #555570;
+      --accent:     #4f46e5;
+      --accent-dim: #e8e7ff;
+      --danger:     #dc2626;
+      --danger-dim: #fee2e2;
+      --green:      #16a34a;
+      --green-dim:  #dcfce7;
+      --warn:       #d97706;
+      --warn-dim:   #fef3c7;
+      --radius:     12px;
+      --radius-sm:  8px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:         #0f0f14;
+        --surface:    #1a1a24;
+        --surface2:   #22222e;
+        --border:     #2e2e40;
+        --text:       #e8e8f0;
+        --text2:      #8888a8;
+        --accent:     #7c76f5;
+        --accent-dim: #1e1b4b;
+        --danger:     #f87171;
+        --danger-dim: #2d1515;
+        --green:      #4ade80;
+        --green-dim:  #052e16;
+        --warn:       #fbbf24;
+        --warn-dim:   #292000;
+      }
+    }
+
+    /* ── Reset ─────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 15px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    button { cursor: pointer; font-family: inherit; font-size: inherit; }
+
+    /* ── Token screen ───────────────────────────────────────────── */
+    #token-screen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #token-screen.visible { display: flex; }
+    .token-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      max-width: 420px;
+      width: 90%;
+    }
+    .token-card h1 { font-size: 1.25rem; margin-bottom: .5rem; }
+    .token-card p { color: var(--text2); font-size: .875rem; margin-bottom: 1.25rem; line-height: 1.6; }
+    .token-card input {
+      width: 100%;
+      padding: .6rem .8rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface2);
+      color: var(--text);
+      font-family: monospace;
+      font-size: .875rem;
+      margin-bottom: .75rem;
+      outline: none;
+    }
+    .token-card input:focus { border-color: var(--accent); }
+    .btn-primary {
+      width: 100%;
+      padding: .65rem 1rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      letter-spacing: .01em;
+    }
+    .btn-primary:hover { opacity: .88; }
+    #token-error {
+      color: var(--danger);
+      font-size: .8rem;
+      margin-top: .5rem;
+      min-height: 1.2em;
+    }
+
+    /* ── App shell ──────────────────────────────────────────────── */
+    #app { display: none; }
+    #app.visible { display: block; }
+
+    .app-header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .app-header h1 { font-size: 1.1rem; font-weight: 700; }
+    .header-meta { color: var(--text2); font-size: .8rem; }
+
+    .header-actions { display: flex; align-items: center; gap: .75rem; }
+    .btn-ghost {
+      padding: .35rem .75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--text2);
+      font-size: .8rem;
+    }
+    .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+
+    /* ── Month filter ───────────────────────────────────────────── */
+    #month-filter {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: .75rem 1.5rem;
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .month-btn {
+      padding: .3rem .75rem;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      background: transparent;
+      color: var(--text2);
+      font-size: .82rem;
+      transition: all .12s;
+    }
+    .month-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .month-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+
+    /* ── Main layout ────────────────────────────────────────────── */
+    .app-body {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 0;
+      min-height: calc(100vh - 120px);
+    }
+    @media (max-width: 900px) {
+      .app-body { grid-template-columns: 1fr; }
+    }
+
+    /* ── Left panel ─────────────────────────────────────────────── */
+    #main-panel {
+      padding: 1.25rem 1.5rem;
+      min-width: 0;
+    }
+
+    /* ── Breadcrumb ─────────────────────────────────────────────── */
+    #breadcrumb {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .82rem;
+      color: var(--text2);
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+    #breadcrumb .crumb { color: var(--accent); cursor: pointer; }
+    #breadcrumb .crumb:hover { text-decoration: underline; }
+    #breadcrumb .crumb-sep { color: var(--border); }
+    #breadcrumb .crumb-current { color: var(--text); font-weight: 600; }
+
+    /* ── Category cards ─────────────────────────────────────────── */
+    #period-total {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--danger);
+      margin-bottom: 1.25rem;
+    }
+    #period-total .label {
+      font-size: .8rem;
+      font-weight: 400;
+      color: var(--text2);
+      display: block;
+      margin-bottom: .15rem;
+    }
+
+    .category-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: .75rem;
+    }
+    .category-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      cursor: pointer;
+      transition: border-color .12s, box-shadow .12s;
+      position: relative;
+    }
+    .category-card:hover {
+      border-color: var(--accent);
+      box-shadow: 0 2px 12px rgba(79,70,229,.1);
+    }
+    .category-card .cat-name {
+      font-size: .82rem;
+      color: var(--text2);
+      margin-bottom: .3rem;
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+    }
+    .category-card .cat-total {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--danger);
+    }
+    .category-card .cat-total.positive { color: var(--green); }
+    .category-card .cat-count {
+      font-size: .75rem;
+      color: var(--text2);
+      margin-top: .2rem;
+    }
+
+    /* ── Merchant list ──────────────────────────────────────────── */
+    .list-header {
+      font-size: .8rem;
+      color: var(--text2);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      margin-bottom: .75rem;
+    }
+    .merchant-list, .tx-table-wrap { }
+    .merchant-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .65rem .9rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-bottom: .45rem;
+      cursor: pointer;
+      transition: border-color .12s;
+      gap: .75rem;
+    }
+    .merchant-row:hover { border-color: var(--accent); }
+    .merchant-row .m-name {
+      font-weight: 500;
+      font-size: .92rem;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      flex: 1;
+      min-width: 0;
+    }
+    .merchant-row .m-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .merchant-row .m-right {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      flex-shrink: 0;
+    }
+    .merchant-row .m-count { font-size: .75rem; color: var(--text2); }
+    .merchant-row .m-total { font-weight: 700; color: var(--danger); font-size: .95rem; }
+    .merchant-row .m-total.positive { color: var(--green); }
+
+    /* ── Transactions table ─────────────────────────────────────── */
+    .tx-table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .875rem;
+    }
+    thead th {
+      text-align: left;
+      font-size: .75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: var(--text2);
+      padding: .5rem .75rem;
+      border-bottom: 2px solid var(--border);
+    }
+    tbody tr { border-bottom: 1px solid var(--border); }
+    tbody tr:last-child { border-bottom: none; }
+    tbody td {
+      padding: .55rem .75rem;
+      vertical-align: middle;
+    }
+    tbody tr.is-refund { background: var(--green-dim); }
+    .amount-neg { color: var(--danger); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .amount-pos { color: var(--green); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .refund-badge {
+      display: inline-block;
+      font-size: .68rem;
+      font-weight: 600;
+      background: var(--green-dim);
+      color: var(--green);
+      border-radius: 4px;
+      padding: 1px 5px;
+      margin-left: .35rem;
+      vertical-align: middle;
+    }
+    .tx-date { color: var(--text2); font-size: .82rem; white-space: nowrap; }
+
+    /* ── Warning badge ──────────────────────────────────────────── */
+    .warn-badge { font-size: .85rem; cursor: help; flex-shrink: 0; }
+    .warn-tooltip {
+      position: fixed;
+      background: var(--surface);
+      border: 1px solid var(--warn);
+      border-radius: var(--radius-sm);
+      padding: .6rem .85rem;
+      font-size: .8rem;
+      color: var(--text);
+      max-width: 280px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.15);
+      z-index: 1000;
+      pointer-events: none;
+      line-height: 1.5;
+    }
+
+    /* ── Priorities sidebar ─────────────────────────────────────── */
+    #priorities-panel {
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      padding: 1.25rem;
+      overflow-y: auto;
+    }
+    @media (max-width: 900px) {
+      #priorities-panel {
+        border-left: none;
+        border-top: 1px solid var(--border);
+      }
+    }
+    #priorities-panel h2 {
+      font-size: .75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--text2);
+      margin-bottom: 1rem;
+    }
+    .priority-item {
+      display: flex;
+      gap: .75rem;
+      margin-bottom: 1rem;
+    }
+    .priority-rank {
+      flex-shrink: 0;
+      width: 1.5rem;
+      height: 1.5rem;
+      border-radius: 50%;
+      background: var(--accent-dim);
+      color: var(--accent);
+      font-size: .75rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-top: .1rem;
+    }
+    .priority-body {}
+    .priority-title { font-weight: 600; font-size: .875rem; margin-bottom: .2rem; }
+    .priority-detail { font-size: .78rem; color: var(--text2); line-height: 1.5; }
+
+    /* ── Loading / error states ─────────────────────────────────── */
+    .state-loading, .state-error {
+      padding: 3rem 1.5rem;
+      text-align: center;
+      color: var(--text2);
+    }
+    .state-error { color: var(--danger); }
+    .spinner {
+      display: inline-block;
+      width: 1.5rem;
+      height: 1.5rem;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      margin-bottom: .75rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Footer ─────────────────────────────────────────────────── */
+    footer {
+      text-align: center;
+      padding: 1.25rem;
+      font-size: .75rem;
+      color: var(--text2);
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--text2); }
+    footer a:hover { color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<!-- ── Token screen ───────────────────────────────────────────────── -->
+<div id="token-screen">
+  <div class="token-card">
+    <h1>Finanças</h1>
+    <p>
+      Para aceder aos dados precisas de um
+      <a href="https://github.com/settings/tokens/new?scopes=gist&description=finance-dashboard" target="_blank" rel="noopener">GitHub Personal Access Token</a>
+      com scope <code>gist</code>. O token fica guardado localmente no browser.
+    </p>
+    <input
+      id="token-input"
+      type="password"
+      placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <button class="btn-primary" onclick="saveToken()">Guardar e carregar</button>
+    <div id="token-error"></div>
+  </div>
+</div>
+
+<!-- ── App ───────────────────────────────────────────────────────── -->
+<div id="app">
+  <header class="app-header">
+    <div>
+      <h1>Finanças</h1>
+      <span class="header-meta" id="header-meta"></span>
+    </div>
+    <div class="header-actions">
+      <button class="btn-ghost" onclick="loadData()" title="Recarregar dados do Gist">↻ Atualizar</button>
+      <button class="btn-ghost" onclick="clearToken()">Mudar token</button>
+    </div>
+  </header>
+
+  <nav id="month-filter"></nav>
+
+  <div class="app-body">
+    <main id="main-panel"></main>
+    <aside id="priorities-panel"></aside>
+  </div>
+
+  <footer>
+    Dados actualizados em <span id="footer-date">—</span> ·
+    <a href="#" onclick="clearToken(); return false;">Mudar token</a>
+  </footer>
+</div>
+
+<!-- ── Tooltip ───────────────────────────────────────────────────── -->
+<div class="warn-tooltip" id="tooltip" style="display:none"></div>
+
+<script>
+// ────────────────────────────────────────────────────────────────────
+// CONFIG — set GIST_ID after running the export script for the first time
+// ────────────────────────────────────────────────────────────────────
+const GIST_ID = '1315a80df7f46d8985fa3fa50548705f';
+
+// ────────────────────────────────────────────────────────────────────
+// State
+// ────────────────────────────────────────────────────────────────────
+const state = {
+  token: null,
+  data: null,
+  activeMonth: 'Todos',
+  view: 'categories',   // 'categories' | 'merchants' | 'transactions'
+  activeCategory: null,
+  activeMerchant: null,
+};
+
+// ────────────────────────────────────────────────────────────────────
+// Utils
+// ────────────────────────────────────────────────────────────────────
+function formatEuro(n) {
+  const abs = Math.abs(n);
+  const formatted = abs.toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (n < 0 ? '-' : '') + '€' + formatted;
+}
+
+function formatDate(iso) {
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function formatMonth(key) {
+  return state.data?.period?.month_labels?.[key] ?? key;
+}
+
+function getMerchantWarning(merchantName) {
+  if (!state.data?.flagged_merchants) return null;
+  const lower = merchantName.toLowerCase();
+  for (const entry of state.data.flagged_merchants) {
+    if (lower.includes(entry.match.toLowerCase())) return entry.warning;
+  }
+  return null;
+}
+
+function getCategoryWarning(categoryName) {
+  if (!state.data?.flagged_categories) return null;
+  const entry = state.data.flagged_categories.find(
+    e => e.category.toLowerCase() === categoryName.toLowerCase()
+  );
+  return entry ? entry.warning : null;
+}
+
+function el(id) { return document.getElementById(id); }
+
+function setHTML(id, html) { el(id).innerHTML = html; }
+
+// ────────────────────────────────────────────────────────────────────
+// Tooltip
+// ────────────────────────────────────────────────────────────────────
+function showTooltip(text, event) {
+  const tip = el('tooltip');
+  tip.textContent = text;
+  tip.style.display = 'block';
+  positionTooltip(event);
+}
+
+function positionTooltip(event) {
+  const tip = el('tooltip');
+  const x = event.clientX + 14;
+  const y = event.clientY + 14;
+  const maxX = window.innerWidth - tip.offsetWidth - 16;
+  const maxY = window.innerHeight - tip.offsetHeight - 16;
+  tip.style.left = Math.min(x, maxX) + 'px';
+  tip.style.top = Math.min(y, maxY) + 'px';
+}
+
+function hideTooltip() {
+  el('tooltip').style.display = 'none';
+}
+
+document.addEventListener('mousemove', e => {
+  if (el('tooltip').style.display !== 'none') positionTooltip(e);
+});
+
+// ────────────────────────────────────────────────────────────────────
+// Auth
+// ────────────────────────────────────────────────────────────────────
+function showTokenScreen(errorMsg) {
+  el('token-screen').classList.add('visible');
+  el('app').classList.remove('visible');
+  el('token-error').textContent = errorMsg || '';
+}
+
+function clearToken() {
+  localStorage.removeItem('gh_token');
+  state.token = null;
+  state.data = null;
+  showTokenScreen();
+}
+
+function saveToken() {
+  const val = el('token-input').value.trim();
+  if (!val) { el('token-error').textContent = 'Introduz um token.'; return; }
+  localStorage.setItem('gh_token', val);
+  state.token = val;
+  el('token-error').textContent = '';
+  loadData();
+}
+
+el('token-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveToken();
+});
+
+// ────────────────────────────────────────────────────────────────────
+// Data loading
+// ────────────────────────────────────────────────────────────────────
+async function loadData() {
+  if (GIST_ID === 'REPLACE_WITH_YOUR_GIST_ID') {
+    el('main-panel').innerHTML = `
+      <div class="state-error">
+        <p>O Gist ID ainda não foi configurado.</p>
+        <p style="font-size:.85rem; margin-top:.5rem; color:var(--text2)">
+          Corre o script de exportação e substitui <code>REPLACE_WITH_YOUR_GIST_ID</code>
+          no ficheiro <code>index.html</code>.
+        </p>
+      </div>`;
+    el('token-screen').classList.remove('visible');
+    el('app').classList.add('visible');
+    return;
+  }
+
+  el('token-screen').classList.remove('visible');
+  el('app').classList.add('visible');
+  el('main-panel').innerHTML = `<div class="state-loading"><div class="spinner"></div><br>A carregar dados…</div>`;
+
+  try {
+    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      headers: {
+        'Authorization': `token ${state.token}`,
+        'Accept': 'application/vnd.github+json',
+      }
+    });
+
+    if (res.status === 401) {
+      localStorage.removeItem('gh_token');
+      showTokenScreen('Token inválido ou expirado. Gera um novo em github.com/settings/tokens.');
+      return;
+    }
+    if (res.status === 404) {
+      el('main-panel').innerHTML = `<div class="state-error">Gist não encontrado. Verifica o GIST_ID no index.html.</div>`;
+      return;
+    }
+    if (!res.ok) {
+      el('main-panel').innerHTML = `<div class="state-error">Erro ${res.status} ao carregar o Gist.</div>`;
+      return;
+    }
+
+    const gist = await res.json();
+    const fileContent = gist.files?.['finance_data.json']?.content;
+    if (!fileContent) {
+      el('main-panel').innerHTML = `<div class="state-error">Ficheiro finance_data.json não encontrado no Gist.</div>`;
+      return;
+    }
+
+    state.data = JSON.parse(fileContent);
+    state.activeMonth = 'Todos';
+    state.view = 'categories';
+    state.activeCategory = null;
+    state.activeMerchant = null;
+
+    // Update footer date
+    if (state.data.generated_at) {
+      const d = new Date(state.data.generated_at);
+      el('footer-date').textContent = d.toLocaleDateString('pt-PT', {
+        day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    render();
+  } catch (err) {
+    el('main-panel').innerHTML = `<div class="state-error">Erro ao carregar: ${err.message}</div>`;
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Render orchestrator
+// ────────────────────────────────────────────────────────────────────
+function render() {
+  renderMonthFilter();
+  renderHeaderMeta();
+  renderPrioritiesPanel();
+  renderMainPanel();
+}
+
+function renderHeaderMeta() {
+  const p = state.data?.period;
+  if (!p) return;
+  const from = formatMonth(p.from);
+  const to = formatMonth(p.to);
+  el('header-meta').textContent = from === to ? from : `${from} – ${to}`;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Month filter
+// ────────────────────────────────────────────────────────────────────
+function renderMonthFilter() {
+  const months = state.data?.period?.months ?? [];
+  const buttons = ['Todos', ...months].map(m => {
+    const label = m === 'Todos' ? 'Todos' : formatMonth(m);
+    const active = state.activeMonth === m ? ' active' : '';
+    return `<button class="month-btn${active}" onclick="setMonth('${m}')">${label}</button>`;
+  });
+  el('month-filter').innerHTML = buttons.join('');
+}
+
+function setMonth(month) {
+  state.activeMonth = month;
+  state.view = 'categories';
+  state.activeCategory = null;
+  state.activeMerchant = null;
+  render();
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Main panel
+// ────────────────────────────────────────────────────────────────────
+function renderMainPanel() {
+  renderBreadcrumb();
+  if (state.view === 'categories') renderCategories();
+  else if (state.view === 'merchants') renderMerchants();
+  else renderTransactions();
+}
+
+// ── Breadcrumb ──────────────────────────────────────────────────────
+function renderBreadcrumb() {
+  const parts = [];
+
+  if (state.view === 'categories') {
+    parts.push(`<span class="crumb-current">Categorias</span>`);
+  } else if (state.view === 'merchants') {
+    parts.push(`<span class="crumb" onclick="goToCategories()">Categorias</span>`);
+    parts.push(`<span class="crumb-sep">›</span>`);
+    parts.push(`<span class="crumb-current">${esc(state.activeCategory)}</span>`);
+  } else {
+    parts.push(`<span class="crumb" onclick="goToCategories()">Categorias</span>`);
+    parts.push(`<span class="crumb-sep">›</span>`);
+    parts.push(`<span class="crumb" onclick="goToMerchants()">${esc(state.activeCategory)}</span>`);
+    parts.push(`<span class="crumb-sep">›</span>`);
+    parts.push(`<span class="crumb-current">${esc(state.activeMerchant)}</span>`);
+  }
+
+  el('main-panel').innerHTML = `<div id="breadcrumb">${parts.join('')}</div><div id="view-content"></div>`;
+}
+
+function goToCategories() {
+  state.view = 'categories';
+  state.activeCategory = null;
+  state.activeMerchant = null;
+  renderMainPanel();
+}
+
+function goToMerchants() {
+  state.view = 'merchants';
+  state.activeMerchant = null;
+  renderMainPanel();
+}
+
+// ── Categories ──────────────────────────────────────────────────────
+function renderCategories() {
+  const catData = state.data?.category_totals?.[state.activeMonth] ?? {};
+  const periodTotal = Object.values(catData).reduce((sum, c) => sum + c.total, 0);
+
+  // Sort by absolute total descending
+  const sorted = Object.entries(catData).sort((a, b) => Math.abs(b[1].total) - Math.abs(a[1].total));
+
+  const cards = sorted.map(([cat, data]) => {
+    const warning = getCategoryWarning(cat);
+    const warnBadge = warning
+      ? `<span class="warn-badge" onmouseenter="showTooltip('${esc(warning)}', event)" onmouseleave="hideTooltip()">⚠️</span>`
+      : '';
+    const totalClass = data.total >= 0 ? 'positive' : '';
+    return `
+      <div class="category-card" onclick="openCategory('${esc(cat)}')">
+        <div class="cat-name">${esc(cat)} ${warnBadge}</div>
+        <div class="cat-total ${totalClass}">${formatEuro(data.total)}</div>
+        <div class="cat-count">${data.tx_count} transaç${data.tx_count === 1 ? 'ão' : 'ões'}</div>
+      </div>`;
+  }).join('');
+
+  const totalClass = periodTotal >= 0 ? '' : '';
+  const view = el('view-content') ?? el('main-panel');
+  view.innerHTML = `
+    <div id="period-total">
+      <span class="label">${state.activeMonth === 'Todos' ? 'Total gasto' : 'Total — ' + formatMonth(state.activeMonth)}</span>
+      ${formatEuro(periodTotal)}
+    </div>
+    <div class="category-grid">${cards}</div>`;
+}
+
+function openCategory(cat) {
+  state.activeCategory = cat;
+  state.view = 'merchants';
+  renderMainPanel();
+}
+
+// ── Merchants ────────────────────────────────────────────────────────
+function renderMerchants() {
+  const merchants = state.data?.merchant_totals?.[state.activeMonth]?.[state.activeCategory] ?? [];
+
+  const rows = merchants.map(m => {
+    const warning = getMerchantWarning(m.merchant);
+    const warnBadge = warning
+      ? `<span class="warn-badge" onmouseenter="showTooltip('${esc(warning)}', event)" onmouseleave="hideTooltip()">⚠️</span>`
+      : '';
+    const totalClass = m.total >= 0 ? 'positive' : '';
+    return `
+      <div class="merchant-row" onclick="openMerchant('${esc(m.merchant)}')">
+        <div class="m-name">${warnBadge}<span>${esc(m.merchant)}</span></div>
+        <div class="m-right">
+          <span class="m-count">${m.tx_count}×</span>
+          <span class="m-total ${totalClass}">${formatEuro(m.total)}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  const view = el('view-content');
+  view.innerHTML = `
+    <div class="list-header">${esc(state.activeCategory)} — ${state.activeMonth === 'Todos' ? 'todos os meses' : formatMonth(state.activeMonth)}</div>
+    <div class="merchant-list">${rows || '<p style="color:var(--text2);padding:.5rem 0">Sem transações.</p>'}</div>`;
+}
+
+function openMerchant(merchant) {
+  state.activeMerchant = merchant;
+  state.view = 'transactions';
+  renderMainPanel();
+}
+
+// ── Transactions ─────────────────────────────────────────────────────
+function renderTransactions() {
+  let txs = state.data?.transactions?.filter(tx =>
+    tx.category === state.activeCategory &&
+    tx.merchant === state.activeMerchant &&
+    (state.activeMonth === 'Todos' || tx.month === state.activeMonth)
+  ) ?? [];
+
+  // Sort newest first
+  txs = txs.slice().sort((a, b) => b.date.localeCompare(a.date));
+
+  const rows = txs.map(tx => {
+    const amtClass = tx.is_refund ? 'amount-pos' : 'amount-neg';
+    const refundBadge = tx.is_refund ? '<span class="refund-badge">reembolso</span>' : '';
+    const rowClass = tx.is_refund ? ' class="is-refund"' : '';
+    return `
+      <tr${rowClass}>
+        <td class="tx-date">${formatDate(tx.date)}</td>
+        <td>${esc(tx.description)}${refundBadge}</td>
+        <td style="text-align:right"><span class="${amtClass}">${formatEuro(tx.amount)}</span></td>
+      </tr>`;
+  }).join('');
+
+  const total = txs.reduce((sum, tx) => sum + tx.amount, 0);
+  const totalClass = total >= 0 ? 'amount-pos' : 'amount-neg';
+
+  const view = el('view-content');
+  view.innerHTML = `
+    <div class="list-header">
+      ${esc(state.activeMerchant)} — ${state.activeMonth === 'Todos' ? 'todos os meses' : formatMonth(state.activeMonth)}
+      &nbsp;·&nbsp; ${txs.length} transaç${txs.length === 1 ? 'ão' : 'ões'}
+      &nbsp;·&nbsp; <span class="${totalClass}">${formatEuro(total)}</span>
+    </div>
+    <div class="tx-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Descrição</th>
+            <th style="text-align:right">Valor</th>
+          </tr>
+        </thead>
+        <tbody>${rows || '<tr><td colspan="3" style="color:var(--text2);padding:.75rem">Sem transações.</td></tr>'}</tbody>
+      </table>
+    </div>`;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Priorities panel
+// ────────────────────────────────────────────────────────────────────
+function renderPrioritiesPanel() {
+  const priorities = state.data?.priorities ?? [];
+  if (!priorities.length) {
+    el('priorities-panel').innerHTML = '';
+    return;
+  }
+
+  const items = priorities.map(p => `
+    <div class="priority-item">
+      <div class="priority-rank">${p.rank}</div>
+      <div class="priority-body">
+        <div class="priority-title">${esc(p.title)}</div>
+        <div class="priority-detail">${esc(p.detail)}</div>
+      </div>
+    </div>`).join('');
+
+  el('priorities-panel').innerHTML = `<h2>Prioridades</h2>${items}`;
+}
+
+// ────────────────────────────────────────────────────────────────────
+// HTML escaping
+// ────────────────────────────────────────────────────────────────────
+function esc(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Init
+// ────────────────────────────────────────────────────────────────────
+function init() {
+  state.token = localStorage.getItem('gh_token');
+  if (!state.token) {
+    showTokenScreen();
+  } else {
+    loadData();
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
