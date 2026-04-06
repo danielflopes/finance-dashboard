@@ -1419,8 +1419,8 @@ function renderTransactions() {
 // Analysis tab
 // ────────────────────────────────────────────────────────────────────
 function renderAnalysisPanel() {
-  const ins = state.data?.insights;
-  if (!ins) {
+  const ins = state.data;
+  if (!ins || !ins.priorities) {
     el('analysis-panel').innerHTML = '<div class="state-error">Sem dados de análise. Corre /finances-savings-analysis primeiro.</div>';
     return;
   }
@@ -1521,7 +1521,7 @@ function renderAnalysisPanel() {
 // Priorities panel
 // ────────────────────────────────────────────────────────────────────
 function renderPrioritiesPanel() {
-  const priorities = state.data?.insights?.priorities ?? [];
+  const priorities = state.data?.priorities ?? [];
   if (!priorities.length) {
     el('priorities-panel').innerHTML = '';
     return;
