@@ -889,7 +889,8 @@ function getMerchantWarning(merchantName) {
   if (!state.data?.flagged_merchants) return null;
   const lower = merchantName.toLowerCase();
   for (const entry of state.data.flagged_merchants) {
-    if (lower.includes(entry.match.toLowerCase())) return entry.warning;
+    const matchStr = entry.match ?? entry.merchant ?? '';
+    if (matchStr && lower.includes(matchStr.toLowerCase())) return entry.warning;
   }
   return null;
 }
@@ -897,7 +898,7 @@ function getMerchantWarning(merchantName) {
 function getCategoryWarning(categoryName) {
   if (!state.data?.flagged_categories) return null;
   const entry = state.data.flagged_categories.find(
-    e => e.category.toLowerCase() === categoryName.toLowerCase()
+    e => e.category?.toLowerCase() === categoryName.toLowerCase()
   );
   return entry ? entry.warning : null;
 }
