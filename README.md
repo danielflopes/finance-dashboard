@@ -9,7 +9,7 @@ Static HTML spending dashboard. Fetches data from a secret GitHub Gist, no backe
 ### 1. Install Python deps
 
 ```bash
-pip3 install openpyxl requests
+pip3 install requests
 ```
 
 ### 2. Generate a GitHub token
@@ -26,13 +26,12 @@ Save the token somewhere — you'll need it in step 3 and 4.
 From the repo root:
 
 ```bash
-GITHUB_TOKEN=ghp_xxx python3 finances/export_to_gist.py
+GITHUB_TOKEN=ghp_xxx python3 finances/sync_to_gist.py
 ```
 
 The script will:
-- Read `finances/transacoes_*.xlsx`
-- Parse `finances/savings_report_*.md`
-- Create a secret Gist with a `finance_data.json` file
+- Read `finances/finance_data.json` (transactions, categories, insights)
+- Create/update a secret Gist with the dashboard payload
 - Save the Gist ID to `finances/.gist_id` (not committed — add to `.gitignore`)
 - Print the Gist ID at the end
 
@@ -76,7 +75,7 @@ Open the URL, enter your GitHub token when prompted. It's saved in `localStorage
 After running `/spending-categorisation` and `/spending-savings` on new statements:
 
 ```bash
-GITHUB_TOKEN=ghp_xxx python3 finances/export_to_gist.py
+GITHUB_TOKEN=ghp_xxx python3 finances/sync_to_gist.py
 ```
 
 Then hit **↻ Atualizar** in the dashboard to pull the latest Gist content.
@@ -86,19 +85,16 @@ Then hit **↻ Atualizar** in the dashboard to pull the latest Gist content.
 ## Options
 
 ```
-python3 finances/export_to_gist.py --help
+python3 finances/sync_to_gist.py --help
 
---token          GitHub PAT (or set GITHUB_TOKEN env var)
---xlsx           Path to XLSX (auto-detects latest transacoes_*.xlsx if omitted)
---savings-report Path to savings report MD (auto-detects latest if omitted)
---gist-id-file   Where to store the Gist ID (default: finances/.gist_id)
---dry-run        Build JSON and write to finances/finance_data_preview.json without pushing
+--token    GitHub PAT (or set GITHUB_TOKEN env var)
+--dry-run  Build JSON and write to finances/finance_data_gist_preview.json without pushing
 ```
 
 Dry run is useful to inspect the JSON before publishing:
 
 ```bash
-python3 finances/export_to_gist.py --dry-run
+python3 finances/sync_to_gist.py --dry-run
 ```
 
 ---

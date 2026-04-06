@@ -447,6 +447,44 @@
     footer a { color: var(--text2); }
     footer a:hover { color: var(--accent); }
 
+    /* ── Grouping toggle ────────────────────────────────────────── */
+    .grouping-toggle {
+      display: inline-flex;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      margin-bottom: 1.25rem;
+    }
+    .grouping-btn {
+      padding: .35rem .9rem;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      color: var(--text2);
+      font-size: .82rem;
+      font-weight: 500;
+      transition: background .12s, color .12s;
+    }
+    .grouping-btn + .grouping-btn {
+      border-left: 1px solid var(--border);
+    }
+    .grouping-btn.active {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 600;
+    }
+    .grouping-btn:hover:not(.active) { background: var(--surface2); color: var(--text); }
+    .merchant-category-tag {
+      font-size: .72rem;
+      color: var(--text2);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
     /* ── Pie chart ──────────────────────────────────────────────── */
     .pie-chart-wrap {
       background: var(--surface);
@@ -504,6 +542,101 @@
     @media (max-width: 600px) {
       .pie-chart-wrap { flex-direction: column; align-items: flex-start; }
     }
+
+    /* ── Tab bar ────────────────────────────────────────────────── */
+    #tab-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 1.5rem;
+      display: flex;
+      gap: 0;
+    }
+    .tab-btn {
+      padding: .75rem 1.25rem;
+      border: none;
+      background: transparent;
+      color: var(--text2);
+      font-size: .875rem;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      transition: color .12s, border-color .12s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      font-weight: 600;
+    }
+
+    /* ── Analysis panel ──────────────────────────────────────────── */
+    #analysis-panel {
+      display: none;
+      padding: 1.5rem;
+      max-width: 860px;
+    }
+    #analysis-panel.visible { display: block; }
+
+    .analysis-section { margin-bottom: 2rem; }
+    .analysis-section h2 {
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--text2);
+      margin-bottom: .9rem;
+    }
+    .analysis-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: .9rem 1.1rem;
+      margin-bottom: .55rem;
+    }
+    .analysis-card-title { font-weight: 600; font-size: .9rem; margin-bottom: .25rem; }
+    .analysis-card-detail { font-size: .82rem; color: var(--text2); line-height: 1.55; }
+
+    .subs-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .subs-table th {
+      text-align: left;
+      padding: .5rem .75rem;
+      color: var(--text2);
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border-bottom: 1px solid var(--border);
+    }
+    .subs-table td {
+      padding: .6rem .75rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    .subs-table tr:last-child td { border-bottom: none; }
+    .verdict-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: .72rem;
+      font-weight: 600;
+    }
+    .verdict-keep { background: var(--green-dim); color: var(--green); }
+    .verdict-review { background: var(--warn-dim); color: var(--warn); }
+    .verdict-unused { background: #fee2e2; color: #dc2626; }
+    @media (prefers-color-scheme: dark) {
+      .verdict-unused { background: #3f0f0f; color: #f87171; }
+    }
+
+    .flag-card {
+      background: var(--warn-dim);
+      border: 1px solid var(--warn);
+      border-radius: var(--radius-sm);
+      padding: .75rem 1rem;
+      margin-bottom: .5rem;
+      font-size: .85rem;
+    }
+    .flag-card-title { font-weight: 600; margin-bottom: .2rem; }
+    .flag-card-body { color: var(--text2); line-height: 1.5; }
   </style>
 </head>
 <body>
@@ -542,12 +675,16 @@
     </div>
   </header>
 
+  <nav id="tab-bar"></nav>
+
   <nav id="month-filter"></nav>
 
-  <div class="app-body">
+  <div id="app-body" class="app-body">
     <main id="main-panel"></main>
     <aside id="priorities-panel"></aside>
   </div>
+
+  <div id="analysis-panel"></div>
 
   <footer>
     Dados actualizados em <span id="footer-date">—</span> ·
@@ -573,9 +710,11 @@ const state = {
   data: null,
   edits: {},  // { "2026-01|Apple": "Subscrições", ... }
   activeMonth: 'Todos',
-  view: 'categories',   // 'categories' | 'merchants' | 'transactions'
+  activeTab: 'gastos',  // 'gastos' | 'analise'
+  view: 'categories',   // 'categories' | 'all-merchants' | 'merchants' | 'transactions'
   activeCategory: null,
   activeMerchant: null,
+  grouping: 'categories',  // 'categories' | 'all-merchants'
 };
 
 // ────────────────────────────────────────────────────────────────────
@@ -585,6 +724,8 @@ const CATEGORY_COLORS = {
   'Viagem':               '#4361ee',
   'Entrust':              '#7209b7',
   'Compras':              '#f72585',
+  'Roupa':                '#ff6b9d',
+  'Cuidados Casa':        '#52b788',
   'Mercado':              '#4cc9f0',
   'Restaurantes':         '#f4a261',
   'Restaurantes Delivery':'#e76f51',
@@ -605,6 +746,13 @@ const MERCHANT_PALETTE = [
   '#e9c46a','#457b9d','#7209b7','#e76f51','#80b918',
   '#0077b6','#ef233c','#ff9f1c','#b5838d','#6c757d','#adb5bd',
 ];
+
+// ── Emoji helper ──────────────────────────────────────────────────────
+function catLabel(cat) {
+  const emojis = state.data?.category_emojis ?? {};
+  const emoji = emojis[cat];
+  return emoji ? `${emoji} ${cat}` : cat;
+}
 
 function _formatEuroSimple(n) {
   return '€' + Math.abs(n).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -670,7 +818,7 @@ function _renderPieChart(containerId, slices) {
 function drawCategoryPie(sorted) {
   const slices = sorted
     .filter(([, d]) => d.total < 0)
-    .map(([cat, d]) => ({ label: cat, value: Math.abs(d.total), color: CATEGORY_COLORS[cat] ?? '#999' }));
+    .map(([cat, d]) => ({ label: catLabel(cat), value: Math.abs(d.total), color: CATEGORY_COLORS[cat] ?? '#999' }));
   _renderPieChart('cat-pie-container', slices);
 }
 
@@ -892,6 +1040,7 @@ async function loadData() {
     const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const months = state.data?.period?.months ?? [];
     state.activeMonth = months.includes(currentKey) ? currentKey : (months[months.length - 1] ?? 'Todos');
+    state.grouping = 'categories';
     state.view = 'categories';
     state.activeCategory = null;
     state.activeMerchant = null;
@@ -914,10 +1063,35 @@ async function loadData() {
 // Render orchestrator
 // ────────────────────────────────────────────────────────────────────
 function render() {
-  renderMonthFilter();
+  renderTabBar();
   renderHeaderMeta();
-  renderPrioritiesPanel();
-  renderMainPanel();
+  const isGastos = state.activeTab === 'gastos';
+  el('month-filter').style.display = isGastos ? '' : 'none';
+  el('app-body').style.display = isGastos ? '' : 'none';
+  if (isGastos) {
+    el('analysis-panel').classList.remove('visible');
+    renderMonthFilter();
+    renderPrioritiesPanel();
+    renderMainPanel();
+  } else {
+    el('analysis-panel').classList.add('visible');
+    renderAnalysisPanel();
+  }
+}
+
+function setTab(tab) {
+  state.activeTab = tab;
+  render();
+}
+
+function renderTabBar() {
+  const tabs = [
+    { id: 'gastos', label: 'Gastos' },
+    { id: 'analise', label: 'Análise' },
+  ];
+  el('tab-bar').innerHTML = tabs.map(t =>
+    `<button class="tab-btn${state.activeTab === t.id ? ' active' : ''}" onclick="setTab('${t.id}')">${t.label}</button>`
+  ).join('');
 }
 
 function renderHeaderMeta() {
@@ -943,7 +1117,7 @@ function renderMonthFilter() {
 
 function setMonth(month) {
   state.activeMonth = month;
-  state.view = 'categories';
+  state.view = state.grouping;
   state.activeCategory = null;
   state.activeMerchant = null;
   render();
@@ -955,6 +1129,7 @@ function setMonth(month) {
 function renderMainPanel() {
   renderBreadcrumb();
   if (state.view === 'categories') renderCategories();
+  else if (state.view === 'all-merchants') renderAllMerchants();
   else if (state.view === 'merchants') renderMerchants();
   else renderTransactions();
 }
@@ -966,11 +1141,18 @@ function renderBreadcrumb() {
 
   if (state.view === 'categories') {
     parts.push(`<span class="crumb-current">Categorias</span>`);
+  } else if (state.view === 'all-merchants') {
+    parts.push(`<span class="crumb-current">Todos os Comerciantes</span>`);
   } else if (state.view === 'merchants') {
     backBtn = `<button class="back-btn" onclick="goToCategories()" title="Voltar">←</button>`;
-    parts.push(`<span class="crumb-current">${esc(state.activeCategory)}</span>`);
+    parts.push(`<span class="crumb-current">${esc(catLabel(state.activeCategory))}</span>`);
   } else {
-    backBtn = `<button class="back-btn" onclick="goToMerchants()" title="Voltar">←</button>`;
+    // transactions — back destination depends on origin
+    if (state.activeCategory === null) {
+      backBtn = `<button class="back-btn" onclick="goToAllMerchants()" title="Voltar">←</button>`;
+    } else {
+      backBtn = `<button class="back-btn" onclick="goToMerchants()" title="Voltar">←</button>`;
+    }
     parts.push(`<span class="crumb-current">${esc(state.activeMerchant)}</span>`);
   }
 
@@ -979,7 +1161,14 @@ function renderBreadcrumb() {
 }
 
 function goToCategories() {
-  state.view = 'categories';
+  state.view = state.grouping === 'all-merchants' ? 'all-merchants' : 'categories';
+  state.activeCategory = null;
+  state.activeMerchant = null;
+  renderMainPanel();
+}
+
+function goToAllMerchants() {
+  state.view = 'all-merchants';
   state.activeCategory = null;
   state.activeMerchant = null;
   renderMainPanel();
@@ -987,6 +1176,14 @@ function goToCategories() {
 
 function goToMerchants() {
   state.view = 'merchants';
+  state.activeMerchant = null;
+  renderMainPanel();
+}
+
+function setGrouping(g) {
+  state.grouping = g;
+  state.view = g;
+  state.activeCategory = null;
   state.activeMerchant = null;
   renderMainPanel();
 }
@@ -1007,7 +1204,7 @@ function renderCategories() {
     const totalClass = data.total >= 0 ? 'positive' : '';
     return `
       <div class="category-card" onclick="openCategory('${esc(cat)}')">
-        <div class="cat-name">${esc(cat)} ${warnBadge}</div>
+        <div class="cat-name">${esc(catLabel(cat))} ${warnBadge}</div>
         <div class="cat-total ${totalClass}">${formatEuro(data.total)}</div>
         <div class="cat-count">${data.tx_count} transaç${data.tx_count === 1 ? 'ão' : 'ões'}</div>
       </div>`;
@@ -1015,6 +1212,10 @@ function renderCategories() {
 
   const view = el('view-content') ?? el('main-panel');
   view.innerHTML = `
+    <div class="grouping-toggle">
+      <button class="grouping-btn active" onclick="setGrouping('categories')">Por Categoria</button>
+      <button class="grouping-btn" onclick="setGrouping('all-merchants')">Por Comerciante</button>
+    </div>
     <div id="period-total">
       <span class="label">${state.activeMonth === 'Todos' ? 'Total gasto' : 'Total — ' + formatMonth(state.activeMonth)}</span>
       ${formatEuro(periodTotal)}
@@ -1027,6 +1228,77 @@ function renderCategories() {
 function openCategory(cat) {
   state.activeCategory = cat;
   state.view = 'merchants';
+  renderMainPanel();
+}
+
+// ── All Merchants (flat, cross-category) ─────────────────────────────
+function getAllMerchantsForMonth(month) {
+  const catTotals = state.data?.merchant_totals?.[month] ?? {};
+  const merged = {};
+  for (const [cat, merchants] of Object.entries(catTotals)) {
+    const effectiveCat = cat;
+    for (const m of merchants) {
+      const key = m.merchant;
+      if (merged[key]) {
+        merged[key].total += m.total;
+        merged[key].tx_count += m.tx_count;
+      } else {
+        merged[key] = { ...m, category: effectiveCat };
+      }
+    }
+  }
+  return Object.values(merged).sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+}
+
+function renderAllMerchants() {
+  const merchants = getAllMerchantsForMonth(state.activeMonth);
+  const periodTotal = merchants.reduce((s, m) => s + m.total, 0);
+
+  const rows = merchants.map(m => {
+    const warning = getMerchantWarning(m.merchant);
+    const warnBadge = warning
+      ? `<span class="warn-badge" onmouseenter="showTooltip('${esc(warning)}', event)" onmouseleave="hideTooltip()">⚠️</span>`
+      : '';
+    const totalClass = m.total >= 0 ? 'positive' : '';
+    const catEmoji = (state.data?.category_emojis ?? {})[m.category] ?? '';
+    const catTag = `<span class="merchant-category-tag">${catEmoji ? catEmoji + ' ' : ''}${esc(m.category)}</span>`;
+
+    return `
+      <div class="merchant-row" onclick="openMerchantFromAll('${esc(m.merchant)}')">
+        <div class="m-name">
+          ${warnBadge}<span>${esc(m.merchant)}</span>
+          ${catTag}
+        </div>
+        <div class="m-right">
+          <span class="m-count">${m.tx_count}×</span>
+          <span class="m-total ${totalClass}">${formatEuro(m.total)}</span>
+        </div>
+      </div>`;
+  }).join('');
+
+  const slices = merchants
+    .filter(m => m.total < 0)
+    .map((m, i) => ({ label: m.merchant, value: Math.abs(m.total), color: MERCHANT_PALETTE[i % MERCHANT_PALETTE.length] }));
+
+  const view = el('view-content');
+  view.innerHTML = `
+    <div class="grouping-toggle">
+      <button class="grouping-btn" onclick="setGrouping('categories')">Por Categoria</button>
+      <button class="grouping-btn active" onclick="setGrouping('all-merchants')">Por Comerciante</button>
+    </div>
+    <div id="period-total">
+      <span class="label">${state.activeMonth === 'Todos' ? 'Total gasto' : 'Total — ' + formatMonth(state.activeMonth)}</span>
+      ${formatEuro(periodTotal)}
+    </div>
+    <div class="pie-chart-wrap" id="merchant-all-pie-container"></div>
+    <div class="merchant-list">${rows || '<p style="color:var(--text2);padding:.5rem 0">Sem transações.</p>'}</div>`;
+  _renderPieChart('merchant-all-pie-container', slices);
+}
+
+function openMerchantFromAll(merchant) {
+  state.activeMerchant = merchant;
+  state.activeCategory = null;  // signals we came from all-merchants
+  state.view = 'transactions';
   renderMainPanel();
 }
 
@@ -1049,7 +1321,7 @@ function renderMerchants() {
     const editedBadge = isEdited ? ' <span style="font-size:.7rem; color:var(--accent)">●</span>' : '';
 
     const categoryOptions = allCategories.map(cat =>
-      `<option value="${cat}" ${effectiveCategory === cat ? 'selected' : ''}>${esc(cat)}</option>`
+      `<option value="${cat}" ${effectiveCategory === cat ? 'selected' : ''}>${esc(catLabel(cat))}</option>`
     ).join('');
 
     return `
@@ -1070,7 +1342,7 @@ function renderMerchants() {
 
   const view = el('view-content');
   view.innerHTML = `
-    <div class="list-header">${esc(state.activeCategory)} — ${state.activeMonth === 'Todos' ? 'todos os meses' : formatMonth(state.activeMonth)}</div>
+    <div class="list-header">${esc(catLabel(state.activeCategory))} — ${state.activeMonth === 'Todos' ? 'todos os meses' : formatMonth(state.activeMonth)}</div>
     <div class="pie-chart-wrap" id="merchant-pie-container"></div>
     <div class="merchant-list">${rows || '<p style="color:var(--text2);padding:.5rem 0">Sem transações.</p>'}</div>`;
   drawMerchantPie(merchants);
@@ -1097,7 +1369,7 @@ function openMerchant(merchant) {
 // ── Transactions ─────────────────────────────────────────────────────
 function renderTransactions() {
   let txs = state.data?.transactions?.filter(tx =>
-    tx.category === state.activeCategory &&
+    (state.activeCategory === null || tx.category === state.activeCategory) &&
     tx.merchant === state.activeMerchant &&
     (state.activeMonth === 'Todos' || tx.month === state.activeMonth)
   ) ?? [];
@@ -1144,10 +1416,112 @@ function renderTransactions() {
 }
 
 // ────────────────────────────────────────────────────────────────────
+// Analysis tab
+// ────────────────────────────────────────────────────────────────────
+function renderAnalysisPanel() {
+  const ins = state.data?.insights;
+  if (!ins) {
+    el('analysis-panel').innerHTML = '<div class="state-error">Sem dados de análise. Corre /finances-savings-analysis primeiro.</div>';
+    return;
+  }
+
+  // Priorities
+  const prioritiesHtml = (ins.priorities ?? []).map(p => `
+    <div class="analysis-card">
+      <div class="analysis-card-title">${p.rank}. ${esc(p.title)}</div>
+      <div class="analysis-card-detail">${esc(p.detail)}</div>
+    </div>`).join('');
+
+  // Subscriptions
+  const verdictClass = v => v === 'Keep' ? 'verdict-keep' : v === 'Potentially unused' ? 'verdict-unused' : 'verdict-review';
+  const verdictLabel = v => v === 'Keep' ? 'Manter' : v === 'Potentially unused' ? 'Não usado?' : 'Rever';
+  const totalSubs = (ins.subscriptions ?? []).reduce((s, x) => s + x.monthly_cost, 0);
+  const subsRows = (ins.subscriptions ?? []).map(s => `
+    <tr>
+      <td>${esc(s.name)}</td>
+      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${_formatEuroSimple(s.monthly_cost)}/mês</td>
+      <td style="color:var(--text2);font-size:.8rem">${esc(s.category)}</td>
+      <td><span class="verdict-badge ${verdictClass(s.verdict)}">${verdictLabel(s.verdict)}</span></td>
+    </tr>`).join('');
+
+  // Anomalies
+  const anomalyHtml = (ins.anomalies ?? []).map(a => `
+    <div class="analysis-card">
+      <div class="analysis-card-title">${esc(a.merchant)} — ${_formatEuroSimple(a.amount)}</div>
+      <div class="analysis-card-detail">${esc(a.date)} · ${esc(a.category)} · mediana da categoria: ${_formatEuroSimple(a.median)}</div>
+    </div>`).join('');
+
+  // Flags (merchants + categories)
+  const flaggedHtml = [
+    ...(ins.flagged_merchants ?? []).map(f => `
+      <div class="flag-card">
+        <div class="flag-card-title">${esc(f.merchant)}</div>
+        <div class="flag-card-body">${esc(f.warning)}</div>
+      </div>`),
+    ...(ins.flagged_categories ?? []).map(f => `
+      <div class="flag-card">
+        <div class="flag-card-title">${esc(f.category)}</div>
+        <div class="flag-card-body">${esc(f.warning)}</div>
+      </div>`)
+  ].join('');
+
+  // Category findings
+  const findingsHtml = (ins.category_findings ?? []).map(f => `
+    <div class="analysis-card">
+      <div class="analysis-card-title">${esc(catLabel(f.category))}</div>
+      <div class="analysis-card-detail">${esc(f.finding)}</div>
+    </div>`).join('');
+
+  el('analysis-panel').innerHTML = `
+    ${prioritiesHtml ? `
+    <div class="analysis-section">
+      <h2>Prioridades de ação</h2>
+      ${prioritiesHtml}
+    </div>` : ''}
+
+    ${(ins.subscriptions ?? []).length ? `
+    <div class="analysis-section">
+      <h2>Subscrições · ${_formatEuroSimple(totalSubs)}/mês</h2>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        <table class="subs-table">
+          <thead>
+            <tr>
+              <th>Serviço</th>
+              <th style="text-align:right">Custo</th>
+              <th>Categoria</th>
+              <th>Veredicto</th>
+            </tr>
+          </thead>
+          <tbody>${subsRows}</tbody>
+        </table>
+      </div>
+    </div>` : ''}
+
+    ${anomalyHtml ? `
+    <div class="analysis-section">
+      <h2>Anomalias</h2>
+      ${anomalyHtml}
+    </div>` : ''}
+
+    ${flaggedHtml ? `
+    <div class="analysis-section">
+      <h2>Alertas</h2>
+      ${flaggedHtml}
+    </div>` : ''}
+
+    ${findingsHtml ? `
+    <div class="analysis-section">
+      <h2>Por categoria</h2>
+      ${findingsHtml}
+    </div>` : ''}
+  `;
+}
+
+// ────────────────────────────────────────────────────────────────────
 // Priorities panel
 // ────────────────────────────────────────────────────────────────────
 function renderPrioritiesPanel() {
-  const priorities = state.data?.priorities ?? [];
+  const priorities = state.data?.insights?.priorities ?? [];
   if (!priorities.length) {
     el('priorities-panel').innerHTML = '';
     return;
