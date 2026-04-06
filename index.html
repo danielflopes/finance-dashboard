@@ -446,7 +446,25 @@
     }
     footer a { color: var(--text2); }
     footer a:hover { color: var(--accent); }
+
+    /* ── Pie chart ──────────────────────────────────────────────── */
+    .pie-chart-wrap {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .pie-chart-wrap canvas {
+      flex-shrink: 0;
+      width: 200px !important;
+      height: 200px !important;
+    }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -519,6 +537,113 @@ const state = {
   activeCategory: null,
   activeMerchant: null,
 };
+
+// ────────────────────────────────────────────────────────────────────
+// Chart helpers
+// ────────────────────────────────────────────────────────────────────
+const CATEGORY_COLORS = {
+  'Viagem':               '#4361ee',
+  'Entrust':              '#7209b7',
+  'Compras':              '#f72585',
+  'Mercado':              '#4cc9f0',
+  'Restaurantes':         '#f4a261',
+  'Restaurantes Delivery':'#e76f51',
+  'Hobbies e Desporto':   '#2a9d8f',
+  'Subscrições':          '#e9c46a',
+  'Serviços Online':      '#457b9d',
+  'Carro':                '#6c757d',
+  'Outro transporte':     '#adb5bd',
+  'Doação':               '#80b918',
+  'Despesas casa':        '#0077b6',
+  'Saúde':                '#ef233c',
+  'Gatinhos':             '#ff9f1c',
+  'Transferencias':       '#b5838d',
+};
+
+const MERCHANT_PALETTE = [
+  '#4361ee','#f72585','#4cc9f0','#f4a261','#2a9d8f',
+  '#e9c46a','#457b9d','#7209b7','#e76f51','#80b918',
+  '#0077b6','#ef233c','#ff9f1c','#b5838d','#6c757d','#adb5bd',
+];
+
+let _activeChart = null;
+
+function _destroyChart() {
+  if (_activeChart) { _activeChart.destroy(); _activeChart = null; }
+}
+
+function _formatEuroSimple(n) {
+  return '€' + Math.abs(n).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function drawCategoryPie(sorted) {
+  _destroyChart();
+  const canvas = document.getElementById('cat-pie');
+  if (!canvas || typeof Chart === 'undefined') return;
+  const expenses = sorted.filter(([, d]) => d.total < 0);
+  if (!expenses.length) return;
+  _activeChart = new Chart(canvas, {
+    type: 'pie',
+    data: {
+      labels: expenses.map(([cat]) => cat),
+      datasets: [{
+        data: expenses.map(([, d]) => Math.abs(d.total)),
+        backgroundColor: expenses.map(([cat]) => CATEGORY_COLORS[cat] ?? '#999'),
+        borderWidth: 1,
+        borderColor: 'var(--surface)',
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { font: { size: 11 }, padding: 12, boxWidth: 14 }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${_formatEuroSimple(ctx.parsed)}`
+          }
+        }
+      }
+    }
+  });
+}
+
+function drawMerchantPie(merchants) {
+  _destroyChart();
+  const canvas = document.getElementById('merchant-pie');
+  if (!canvas || typeof Chart === 'undefined') return;
+  const expenses = merchants.filter(m => m.total < 0);
+  if (!expenses.length) return;
+  const sorted = [...expenses].sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
+  _activeChart = new Chart(canvas, {
+    type: 'pie',
+    data: {
+      labels: sorted.map(m => m.merchant),
+      datasets: [{
+        data: sorted.map(m => Math.abs(m.total)),
+        backgroundColor: sorted.map((_, i) => MERCHANT_PALETTE[i % MERCHANT_PALETTE.length]),
+        borderWidth: 1,
+        borderColor: 'var(--surface)',
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { font: { size: 11 }, padding: 12, boxWidth: 14 }
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${_formatEuroSimple(ctx.parsed)}`
+          }
+        }
+      }
+    }
+  });
+}
 
 // ────────────────────────────────────────────────────────────────────
 // Utils
@@ -814,6 +939,7 @@ function renderBreadcrumb() {
 }
 
 function goToCategories() {
+  _destroyChart();
   state.view = 'categories';
   state.activeCategory = null;
   state.activeMerchant = null;
@@ -821,6 +947,7 @@ function goToCategories() {
 }
 
 function goToMerchants() {
+  _destroyChart();
   state.view = 'merchants';
   state.activeMerchant = null;
   renderMainPanel();
@@ -848,17 +975,21 @@ function renderCategories() {
       </div>`;
   }).join('');
 
-  const totalClass = periodTotal >= 0 ? '' : '';
   const view = el('view-content') ?? el('main-panel');
   view.innerHTML = `
     <div id="period-total">
       <span class="label">${state.activeMonth === 'Todos' ? 'Total gasto' : 'Total — ' + formatMonth(state.activeMonth)}</span>
       ${formatEuro(periodTotal)}
     </div>
+    <div class="pie-chart-wrap">
+      <canvas id="cat-pie" width="200" height="200"></canvas>
+    </div>
     <div class="category-grid">${cards}</div>`;
+  drawCategoryPie(sorted);
 }
 
 function openCategory(cat) {
+  _destroyChart();
   state.activeCategory = cat;
   state.view = 'merchants';
   renderMainPanel();
@@ -905,7 +1036,11 @@ function renderMerchants() {
   const view = el('view-content');
   view.innerHTML = `
     <div class="list-header">${esc(state.activeCategory)} — ${state.activeMonth === 'Todos' ? 'todos os meses' : formatMonth(state.activeMonth)}</div>
+    <div class="pie-chart-wrap">
+      <canvas id="merchant-pie" width="200" height="200"></canvas>
+    </div>
     <div class="merchant-list">${rows || '<p style="color:var(--text2);padding:.5rem 0">Sem transações.</p>'}</div>`;
+  drawMerchantPie(merchants);
 }
 
 function changeMerchantCategory(merchant, newCategory) {
@@ -921,6 +1056,7 @@ function changeMerchantCategory(merchant, newCategory) {
 }
 
 function openMerchant(merchant) {
+  _destroyChart();
   state.activeMerchant = merchant;
   state.view = 'transactions';
   renderMainPanel();
