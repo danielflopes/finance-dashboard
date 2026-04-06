@@ -452,19 +452,59 @@
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 1rem 1.25rem;
+      padding: 1.25rem 1.5rem;
       margin-bottom: 1.25rem;
       display: flex;
       align-items: center;
-      gap: 1rem;
+      gap: 2rem;
     }
-    .pie-chart-wrap canvas {
+    .pie-chart-wrap svg { flex-shrink: 0; display: block; }
+    .pie-legend {
+      display: flex;
+      flex-direction: column;
+      gap: .45rem;
+      flex: 1;
+      min-width: 0;
+    }
+    .pie-legend-item {
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+      font-size: .82rem;
+      line-height: 1.3;
+    }
+    .pie-legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
       flex-shrink: 0;
-      width: 200px !important;
-      height: 200px !important;
+    }
+    .pie-legend-label {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: var(--text);
+    }
+    .pie-legend-amount {
+      font-weight: 600;
+      color: var(--amount);
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      font-size: .82rem;
+    }
+    .pie-legend-pct {
+      color: var(--text2);
+      font-size: .75rem;
+      white-space: nowrap;
+      min-width: 2.5rem;
+      text-align: right;
+    }
+    @media (max-width: 600px) {
+      .pie-chart-wrap { flex-direction: column; align-items: flex-start; }
     }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
@@ -539,7 +579,7 @@ const state = {
 };
 
 // ────────────────────────────────────────────────────────────────────
-// Chart helpers
+// Chart helpers — pure SVG donut, no external deps
 // ────────────────────────────────────────────────────────────────────
 const CATEGORY_COLORS = {
   'Viagem':               '#4361ee',
@@ -566,83 +606,80 @@ const MERCHANT_PALETTE = [
   '#0077b6','#ef233c','#ff9f1c','#b5838d','#6c757d','#adb5bd',
 ];
 
-let _activeChart = null;
-
-function _destroyChart() {
-  if (_activeChart) { _activeChart.destroy(); _activeChart = null; }
-}
-
 function _formatEuroSimple(n) {
   return '€' + Math.abs(n).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function drawCategoryPie(sorted) {
-  _destroyChart();
-  const canvas = document.getElementById('cat-pie');
-  if (!canvas || typeof Chart === 'undefined') return;
-  const expenses = sorted.filter(([, d]) => d.total < 0);
-  if (!expenses.length) return;
-  _activeChart = new Chart(canvas, {
-    type: 'pie',
-    data: {
-      labels: expenses.map(([cat]) => cat),
-      datasets: [{
-        data: expenses.map(([, d]) => Math.abs(d.total)),
-        backgroundColor: expenses.map(([cat]) => CATEGORY_COLORS[cat] ?? '#999'),
-        borderWidth: 1,
-        borderColor: 'var(--surface)',
-      }]
-    },
-    options: {
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'right',
-          labels: { font: { size: 11 }, padding: 12, boxWidth: 14 }
-        },
-        tooltip: {
-          callbacks: {
-            label: ctx => ` ${ctx.label}: ${_formatEuroSimple(ctx.parsed)}`
-          }
-        }
-      }
-    }
+function _buildDonutPaths(slices) {
+  const cx = 100, cy = 100, R = 90, r = 52;
+  const total = slices.reduce((s, x) => s + x.value, 0);
+  if (total === 0) return [];
+  let angle = -Math.PI / 2;
+  return slices.map(s => {
+    const sweep = (s.value / total) * 2 * Math.PI;
+    const gap = sweep > 0.05 ? 0.013 : 0;
+    const a0 = angle + gap;
+    const a1 = angle + sweep - gap;
+    const large = sweep > Math.PI ? 1 : 0;
+    const cos = Math.cos, sin = Math.sin;
+    const fmt = n => n.toFixed(3);
+    const d = [
+      `M ${fmt(cx + R*cos(a0))} ${fmt(cy + R*sin(a0))}`,
+      `A ${R} ${R} 0 ${large} 1 ${fmt(cx + R*cos(a1))} ${fmt(cy + R*sin(a1))}`,
+      `L ${fmt(cx + r*cos(a1))} ${fmt(cy + r*sin(a1))}`,
+      `A ${r} ${r} 0 ${large} 0 ${fmt(cx + r*cos(a0))} ${fmt(cy + r*sin(a0))}`,
+      'Z'
+    ].join(' ');
+    const result = { ...s, d, pct: s.value / total };
+    angle += sweep;
+    return result;
   });
 }
 
+function _renderPieChart(containerId, slices) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  if (!slices.length) { container.innerHTML = ''; return; }
+
+  const paths = _buildDonutPaths(slices);
+
+  const pathsSVG = paths.map(p => {
+    const tip = `${p.label}: ${_formatEuroSimple(p.value)} (${(p.pct * 100).toFixed(1)}%)`;
+    return `<path d="${p.d}" fill="${p.color}"
+      data-tip="${tip.replace(/"/g, '&quot;')}"
+      style="opacity:.88;transition:opacity .15s;cursor:default"
+      onmouseenter="this.style.opacity='1';showTooltip(this.dataset.tip,event)"
+      onmouseleave="this.style.opacity='.88';hideTooltip()" />`;
+  }).join('');
+
+  const legendItems = paths.map(p => `
+    <div class="pie-legend-item">
+      <div class="pie-legend-dot" style="background:${p.color}"></div>
+      <span class="pie-legend-label" title="${p.label}">${p.label}</span>
+      <span class="pie-legend-amount">${_formatEuroSimple(p.value)}</span>
+      <span class="pie-legend-pct">${(p.pct * 100).toFixed(0)}%</span>
+    </div>`).join('');
+
+  container.innerHTML = `
+    <svg viewBox="0 0 200 200" width="200" height="200" style="overflow:visible">
+      ${pathsSVG}
+    </svg>
+    <div class="pie-legend">${legendItems}</div>`;
+}
+
+function drawCategoryPie(sorted) {
+  const slices = sorted
+    .filter(([, d]) => d.total < 0)
+    .map(([cat, d]) => ({ label: cat, value: Math.abs(d.total), color: CATEGORY_COLORS[cat] ?? '#999' }));
+  _renderPieChart('cat-pie-container', slices);
+}
+
 function drawMerchantPie(merchants) {
-  _destroyChart();
-  const canvas = document.getElementById('merchant-pie');
-  if (!canvas || typeof Chart === 'undefined') return;
-  const expenses = merchants.filter(m => m.total < 0);
-  if (!expenses.length) return;
-  const sorted = [...expenses].sort((a, b) => Math.abs(b.total) - Math.abs(a.total));
-  _activeChart = new Chart(canvas, {
-    type: 'pie',
-    data: {
-      labels: sorted.map(m => m.merchant),
-      datasets: [{
-        data: sorted.map(m => Math.abs(m.total)),
-        backgroundColor: sorted.map((_, i) => MERCHANT_PALETTE[i % MERCHANT_PALETTE.length]),
-        borderWidth: 1,
-        borderColor: 'var(--surface)',
-      }]
-    },
-    options: {
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: 'right',
-          labels: { font: { size: 11 }, padding: 12, boxWidth: 14 }
-        },
-        tooltip: {
-          callbacks: {
-            label: ctx => ` ${ctx.label}: ${_formatEuroSimple(ctx.parsed)}`
-          }
-        }
-      }
-    }
-  });
+  const slices = [...merchants]
+    .filter(m => m.total < 0)
+    .sort((a, b) => Math.abs(b.total) - Math.abs(a.total))
+    .map((m, i) => ({ label: m.merchant, value: Math.abs(m.total), color: MERCHANT_PALETTE[i % MERCHANT_PALETTE.length] }));
+  _renderPieChart('merchant-pie-container', slices);
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -939,7 +976,6 @@ function renderBreadcrumb() {
 }
 
 function goToCategories() {
-  _destroyChart();
   state.view = 'categories';
   state.activeCategory = null;
   state.activeMerchant = null;
@@ -947,7 +983,6 @@ function goToCategories() {
 }
 
 function goToMerchants() {
-  _destroyChart();
   state.view = 'merchants';
   state.activeMerchant = null;
   renderMainPanel();
@@ -981,15 +1016,12 @@ function renderCategories() {
       <span class="label">${state.activeMonth === 'Todos' ? 'Total gasto' : 'Total — ' + formatMonth(state.activeMonth)}</span>
       ${formatEuro(periodTotal)}
     </div>
-    <div class="pie-chart-wrap">
-      <canvas id="cat-pie" width="200" height="200"></canvas>
-    </div>
+    <div class="pie-chart-wrap" id="cat-pie-container"></div>
     <div class="category-grid">${cards}</div>`;
   drawCategoryPie(sorted);
 }
 
 function openCategory(cat) {
-  _destroyChart();
   state.activeCategory = cat;
   state.view = 'merchants';
   renderMainPanel();
@@ -1036,9 +1068,7 @@ function renderMerchants() {
   const view = el('view-content');
   view.innerHTML = `
     <div class="list-header">${esc(state.activeCategory)} — ${state.activeMonth === 'Todos' ? 'todos os meses' : formatMonth(state.activeMonth)}</div>
-    <div class="pie-chart-wrap">
-      <canvas id="merchant-pie" width="200" height="200"></canvas>
-    </div>
+    <div class="pie-chart-wrap" id="merchant-pie-container"></div>
     <div class="merchant-list">${rows || '<p style="color:var(--text2);padding:.5rem 0">Sem transações.</p>'}</div>`;
   drawMerchantPie(merchants);
 }
@@ -1056,7 +1086,6 @@ function changeMerchantCategory(merchant, newCategory) {
 }
 
 function openMerchant(merchant) {
-  _destroyChart();
   state.activeMerchant = merchant;
   state.view = 'transactions';
   renderMainPanel();
