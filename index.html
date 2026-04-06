@@ -1474,10 +1474,11 @@ function renderAnalysisPanel() {
     </div>`).join('');
 
   el('analysis-panel').innerHTML = `
-    ${prioritiesHtml ? `
+    
+  ${findingsHtml ? `
     <div class="analysis-section">
-      <h2>Prioridades de ação</h2>
-      ${prioritiesHtml}
+      <h2>Por categoria</h2>
+      ${findingsHtml}
     </div>` : ''}
 
     ${(ins.subscriptions ?? []).length ? `
@@ -1498,23 +1499,12 @@ function renderAnalysisPanel() {
       </div>
     </div>` : ''}
 
-    ${anomalyHtml ? `
+    ${prioritiesHtml ? `
     <div class="analysis-section">
-      <h2>Anomalias</h2>
-      ${anomalyHtml}
+      <h2>Prioridades de ação</h2>
+      ${prioritiesHtml}
     </div>` : ''}
 
-    ${flaggedHtml ? `
-    <div class="analysis-section">
-      <h2>Alertas</h2>
-      ${flaggedHtml}
-    </div>` : ''}
-
-    ${findingsHtml ? `
-    <div class="analysis-section">
-      <h2>Por categoria</h2>
-      ${findingsHtml}
-    </div>` : ''}
   `;
 }
 
