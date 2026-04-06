@@ -888,7 +888,10 @@ async function loadData() {
       console.warn("Could not load edits Gist:", err.message);
     }
 
-    state.activeMonth = 'Todos';
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const months = state.data?.period?.months ?? [];
+    state.activeMonth = months.includes(currentKey) ? currentKey : (months[months.length - 1] ?? 'Todos');
     state.view = 'categories';
     state.activeCategory = null;
     state.activeMerchant = null;
