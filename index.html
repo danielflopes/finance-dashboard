@@ -637,6 +637,129 @@
     }
     .flag-card-title { font-weight: 600; margin-bottom: .2rem; }
     .flag-card-body { color: var(--text2); line-height: 1.5; }
+
+    /* ── Rich analysis report ────────────────────────────────────── */
+    .analysis-header {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.4rem;
+      margin-bottom: 1.5rem;
+    }
+    .analysis-header .meta {
+      font-size: .78rem;
+      color: var(--text2);
+      margin-bottom: .5rem;
+    }
+    .analysis-header .takeaway {
+      font-size: 1rem;
+      font-weight: 600;
+      line-height: 1.45;
+    }
+    .overview-table, .evolution-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .82rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .overview-table th, .evolution-table th {
+      text-align: left;
+      padding: .55rem .75rem;
+      color: var(--text2);
+      font-size: .7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface2);
+    }
+    .overview-table td, .evolution-table td {
+      padding: .55rem .75rem;
+      border-bottom: 1px solid var(--border);
+      font-variant-numeric: tabular-nums;
+    }
+    .overview-table tr:last-child td, .evolution-table tr:last-child td { border-bottom: none; }
+    .overview-table .num, .evolution-table .num { text-align: right; }
+    .narrative-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.3rem;
+      margin-bottom: .75rem;
+    }
+    .narrative-card h3 {
+      font-size: .95rem;
+      margin-bottom: .6rem;
+      display: flex;
+      align-items: baseline;
+      gap: .5rem;
+    }
+    .narrative-card h3 .total {
+      font-size: .8rem;
+      color: var(--text2);
+      font-weight: 500;
+    }
+    .narrative-body {
+      font-size: .85rem;
+      line-height: 1.6;
+      color: var(--text);
+    }
+    .narrative-body p { margin: 0 0 .7rem 0; }
+    .narrative-body p:last-child { margin-bottom: 0; }
+    .narrative-body strong { color: var(--text); }
+    .narrative-body table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .78rem;
+      margin: .6rem 0;
+      background: var(--surface2);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    .narrative-body th, .narrative-body td {
+      text-align: left;
+      padding: .4rem .65rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .narrative-body th {
+      font-size: .68rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--text2);
+      font-weight: 700;
+    }
+    .narrative-body tr:last-child td { border-bottom: none; }
+    .narrative-body ul { margin: .4rem 0 .6rem 1.2rem; }
+    .narrative-body li { margin-bottom: .3rem; }
+    .commentary-list {
+      margin: .8rem 0 0 0;
+      padding-left: 1.2rem;
+      font-size: .82rem;
+      color: var(--text2);
+      line-height: 1.55;
+    }
+    .commentary-list li { margin-bottom: .35rem; }
+    .priority-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 1rem 1.2rem;
+      margin-bottom: .65rem;
+    }
+    .priority-card .rank-title {
+      font-weight: 600;
+      font-size: .92rem;
+      margin-bottom: .35rem;
+    }
+    .priority-card .rank-detail {
+      font-size: .82rem;
+      color: var(--text2);
+      line-height: 1.55;
+    }
   </style>
 </head>
 <body>
@@ -1419,92 +1542,232 @@ function renderTransactions() {
 // ────────────────────────────────────────────────────────────────────
 // Analysis tab
 // ────────────────────────────────────────────────────────────────────
+
+// Convert a narrative markdown string to safe HTML.
+// Handles: **bold**, pipe tables, - bullet lists, double-newline paragraphs.
+function narrativeToHtml(text) {
+  if (!text) return '';
+  const lines = text.split('\n');
+  let html = '';
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    // Pipe table: collect all consecutive table lines
+    if (line.trim().startsWith('|')) {
+      const tableLines = [];
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        tableLines.push(lines[i]);
+        i++;
+      }
+      // First row = header, second row = separator (skip), rest = body
+      const rows = tableLines.filter(l => !/^\s*\|[\s\-:]+\|/.test(l));
+      if (rows.length > 0) {
+        const parseRow = r => r.split('|').slice(1, -1).map(c => c.trim());
+        const head = parseRow(rows[0]);
+        const body = rows.slice(1);
+        html += '<table>';
+        html += '<thead><tr>' + head.map(h => `<th>${inlineToHtml(h)}</th>`).join('') + '</tr></thead>';
+        if (body.length) {
+          html += '<tbody>' + body.map(r => '<tr>' + parseRow(r).map(c => `<td>${inlineToHtml(c)}</td>`).join('') + '</tr>').join('') + '</tbody>';
+        }
+        html += '</table>';
+      }
+      continue;
+    }
+    // Bullet list item
+    if (/^\s*-\s/.test(line)) {
+      html += '<ul>';
+      while (i < lines.length && /^\s*-\s/.test(lines[i])) {
+        html += '<li>' + inlineToHtml(lines[i].replace(/^\s*-\s/, '')) + '</li>';
+        i++;
+      }
+      html += '</ul>';
+      continue;
+    }
+    // Blank line — ignored, paragraph breaks handled by grouping
+    if (line.trim() === '') { i++; continue; }
+    // Normal paragraph line
+    html += '<p>' + inlineToHtml(line) + '</p>';
+    i++;
+  }
+  return html;
+}
+
+function inlineToHtml(text) {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+}
+
 function renderAnalysisPanel() {
-  const ins = state.data;
+  const ins = state.data?.insights;
   if (!ins || !ins.priorities) {
     el('analysis-panel').innerHTML = '<div class="state-error">Sem dados de análise. Corre /finances-savings-analysis primeiro.</div>';
     return;
   }
 
-  // Priorities
-  const prioritiesHtml = (ins.priorities ?? []).map(p => `
-    <div class="analysis-card">
-      <div class="analysis-card-title">${p.rank}. ${esc(p.title)}</div>
-      <div class="analysis-card-detail">${esc(p.detail)}</div>
-    </div>`).join('');
-
-  // Subscriptions
   const verdictClass = v => v === 'Keep' ? 'verdict-keep' : v === 'Potentially unused' ? 'verdict-unused' : 'verdict-review';
   const verdictLabel = v => v === 'Keep' ? 'Manter' : v === 'Potentially unused' ? 'Não usado?' : 'Rever';
-  const totalSubs = (ins.subscriptions ?? []).reduce((s, x) => s + x.monthly_cost, 0);
-  const subsRows = (ins.subscriptions ?? []).map(s => `
-    <tr>
-      <td>${esc(s.name)}</td>
-      <td style="text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${_formatEuroSimple(s.monthly_cost)}/mês</td>
-      <td style="color:var(--text2);font-size:.8rem">${esc(s.category)}</td>
-      <td><span class="verdict-badge ${verdictClass(s.verdict)}">${verdictLabel(s.verdict)}</span></td>
-    </tr>`).join('');
 
-  // Anomalies
-  const anomalyHtml = (ins.anomalies ?? []).map(a => `
-    <div class="analysis-card">
-      <div class="analysis-card-title">${esc(a.merchant)} — ${_formatEuroSimple(a.amount)}</div>
-      <div class="analysis-card-detail">${esc(a.date)} · ${esc(a.category)} · mediana da categoria: ${_formatEuroSimple(a.median)}</div>
-    </div>`).join('');
+  // ── Header ──────────────────────────────────────────────────────
+  const p = ins.period ?? {};
+  const headerHtml = p.total_spent ? `
+    <div class="analysis-header">
+      <div class="meta">
+        ${p.from ? `${p.from} – ${p.to}` : ''}
+        ${p.total_spent ? ` · Total gasto: <strong>${_formatEuroSimple(Math.abs(p.total_spent))}</strong>` : ''}
+        ${p.avg_monthly ? ` · Média/mês: <strong>${_formatEuroSimple(Math.abs(p.avg_monthly))}</strong>` : ''}
+      </div>
+      ${p.top_takeaway ? `<div class="takeaway">${inlineToHtml(p.top_takeaway)}</div>` : ''}
+    </div>` : '';
 
-  // Flags (merchants + categories)
-  const flaggedHtml = [
-    ...(ins.flagged_merchants ?? []).map(f => `
-      <div class="flag-card">
-        <div class="flag-card-title">${esc(f.merchant)}</div>
-        <div class="flag-card-body">${esc(f.warning)}</div>
-      </div>`),
-    ...(ins.flagged_categories ?? []).map(f => `
-      <div class="flag-card">
-        <div class="flag-card-title">${esc(f.category)}</div>
-        <div class="flag-card-body">${esc(f.warning)}</div>
-      </div>`)
-  ].join('');
+  // ── Spending overview table ──────────────────────────────────────
+  const overviewRows = (ins.spending_overview ?? []).map(o => {
+    const trend = o.trend ?? '';
+    const trendColor = trend === '↑' ? 'color:var(--warn)' : trend === '↓' ? 'color:var(--green)' : 'color:var(--text2)';
+    return `<tr>
+      <td>${esc(catLabel(o.category))}</td>
+      <td class="num" style="font-weight:600">${_formatEuroSimple(Math.abs(o.total))}</td>
+      <td class="num" style="color:var(--text2)">${o.pct_of_total?.toFixed(1)}%</td>
+      <td class="num" style="color:var(--text2)">${_formatEuroSimple(Math.abs(o.avg_monthly))}/mês</td>
+      ${trend ? `<td class="num" style="${trendColor};font-weight:700">${trend}</td>` : '<td></td>'}
+    </tr>`;
+  }).join('');
 
-  // Category findings
-  const findingsHtml = (ins.category_findings ?? []).map(f => `
-    <div class="analysis-card">
-      <div class="analysis-card-title">${esc(catLabel(f.category))}</div>
-      <div class="analysis-card-detail">${esc(f.finding)}</div>
-    </div>`).join('');
-
-  el('analysis-panel').innerHTML = `
-    
-  ${findingsHtml ? `
+  const overviewHtml = overviewRows ? `
     <div class="analysis-section">
-      <h2>Por categoria</h2>
-      ${findingsHtml}
-    </div>` : ''}
+      <h2>Panorama de gastos</h2>
+      <table class="overview-table">
+        <thead><tr>
+          <th>Categoria</th>
+          <th style="text-align:right">Total</th>
+          <th style="text-align:right">% total</th>
+          <th style="text-align:right">Avg/mês</th>
+          <th style="text-align:right">Tendência</th>
+        </tr></thead>
+        <tbody>${overviewRows}</tbody>
+      </table>
+      ${ins.spending_overview_narrative ? `<p style="margin-top:.8rem;font-size:.85rem;color:var(--text2);line-height:1.55">${inlineToHtml(ins.spending_overview_narrative)}</p>` : ''}
+    </div>` : '';
 
-    ${(ins.subscriptions ?? []).length ? `
+  // ── Monthly evolution ────────────────────────────────────────────
+  let evolutionHtml = '';
+  const ev = ins.monthly_evolution;
+  if (ev && ev.months && ev.months.length > 1 && ev.categories) {
+    const months = ev.months;
+    const cats = Object.keys(ev.categories);
+    const formatMonthLabel = m => {
+      const [y, mo] = m.split('-');
+      const names = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+      return names[parseInt(mo)] ?? m;
+    };
+    const evRows = cats.map(cat => {
+      const vals = ev.categories[cat];
+      return `<tr>
+        <td>${esc(catLabel(cat))}</td>
+        ${vals.map(v => `<td class="num" style="color:var(--text2)">${v ? _formatEuroSimple(Math.abs(v)) : '—'}</td>`).join('')}
+      </tr>`;
+    }).join('');
+    const commentary = (ev.commentary ?? []).map(c => `<li>${inlineToHtml(c)}</li>`).join('');
+    evolutionHtml = `
+      <div class="analysis-section">
+        <h2>Evolução mensal</h2>
+        <table class="evolution-table">
+          <thead><tr>
+            <th>Categoria</th>
+            ${months.map(m => `<th style="text-align:right">${formatMonthLabel(m)}</th>`).join('')}
+          </tr></thead>
+          <tbody>${evRows}</tbody>
+        </table>
+        ${commentary ? `<ul class="commentary-list">${commentary}</ul>` : ''}
+      </div>`;
+  }
+
+  // ── Subscriptions ────────────────────────────────────────────────
+  const totalSubs = ins.subscriptions_total_monthly
+    ?? (ins.subscriptions ?? []).reduce((s, x) => s + x.monthly_cost, 0);
+  const subsHtml = (ins.subscriptions ?? []).length ? `
     <div class="analysis-section">
       <h2>Subscrições · ${_formatEuroSimple(totalSubs)}/mês</h2>
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
-        <table class="subs-table">
-          <thead>
-            <tr>
-              <th>Serviço</th>
-              <th style="text-align:right">Custo</th>
-              <th>Categoria</th>
-              <th>Veredicto</th>
-            </tr>
-          </thead>
-          <tbody>${subsRows}</tbody>
-        </table>
-      </div>
-    </div>` : ''}
+      ${(ins.subscriptions ?? []).map(s => `
+        <div class="narrative-card" style="margin-bottom:.6rem">
+          <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:${s.detail ? '.45rem' : '0'}">
+            <span style="font-weight:600;font-size:.9rem">${esc(s.name)}</span>
+            <span style="font-variant-numeric:tabular-nums;font-weight:600;font-size:.88rem">${_formatEuroSimple(s.monthly_cost)}/mês</span>
+            <span style="color:var(--text2);font-size:.78rem">${esc(s.category)}</span>
+            <span class="verdict-badge ${verdictClass(s.verdict)}" style="margin-left:auto">${verdictLabel(s.verdict)}</span>
+          </div>
+          ${s.detail ? `<div class="narrative-body" style="margin-top:.3rem"><p>${inlineToHtml(s.detail)}</p></div>` : ''}
+        </div>`).join('')}
+    </div>` : '';
 
-    ${prioritiesHtml ? `
+  // ── Category findings ────────────────────────────────────────────
+  const findingsHtml = (ins.category_findings ?? []).length ? `
+    <div class="analysis-section">
+      <h2>Por categoria</h2>
+      ${(ins.category_findings ?? []).map(f => `
+        <div class="narrative-card">
+          <h3>
+            ${esc(catLabel(f.category))}
+            ${f.total ? `<span class="total">${_formatEuroSimple(Math.abs(f.total))}</span>` : ''}
+          </h3>
+          <div class="narrative-body">${narrativeToHtml(f.narrative ?? f.finding ?? '')}</div>
+        </div>`).join('')}
+    </div>` : '';
+
+  // ── Anomalies ────────────────────────────────────────────────────
+  const anomalyHtml = (ins.anomalies ?? []).length ? `
+    <div class="analysis-section">
+      <h2>Anomalias</h2>
+      ${(ins.anomalies ?? []).map(a => `
+        <div class="narrative-card" style="margin-bottom:.55rem">
+          <div style="font-weight:600;font-size:.9rem;margin-bottom:.2rem">
+            ${esc(a.merchant)} — ${_formatEuroSimple(a.amount)}
+          </div>
+          <div style="font-size:.82rem;color:var(--text2);line-height:1.5">
+            ${esc(a.date)} · ${esc(a.category)} · mediana: ${_formatEuroSimple(a.median)}
+            ${a.context ? ` · ${inlineToHtml(a.context)}` : ''}
+          </div>
+        </div>`).join('')}
+    </div>` : '';
+
+  // ── Flagged categories ───────────────────────────────────────────
+  const flaggedItems = [
+    ...(ins.flagged_merchants ?? []).map(f => ({ title: f.merchant, body: f.warning })),
+    ...(ins.flagged_categories ?? []).map(f => ({ title: f.category, body: f.finding }))
+  ];
+  const flaggedHtml = flaggedItems.length ? `
+    <div class="analysis-section">
+      <h2>Categorias a monitorar</h2>
+      ${flaggedItems.map(f => `
+        <div class="flag-card">
+          <div class="flag-card-title">${esc(catLabel(f.title))}</div>
+          <div class="flag-card-body">${inlineToHtml(f.body ?? '')}</div>
+        </div>`).join('')}
+    </div>` : '';
+
+  // ── Priorities ───────────────────────────────────────────────────
+  const prioritiesHtml = (ins.priorities ?? []).length ? `
     <div class="analysis-section">
       <h2>Prioridades de ação</h2>
-      ${prioritiesHtml}
-    </div>` : ''}
+      ${(ins.priorities ?? []).map(p => `
+        <div class="priority-card">
+          <div class="rank-title">${p.rank}. ${inlineToHtml(p.title)}</div>
+          <div class="rank-detail">${inlineToHtml(p.detail)}</div>
+        </div>`).join('')}
+    </div>` : '';
 
+  el('analysis-panel').innerHTML = `
+    ${headerHtml}
+    ${overviewHtml}
+    ${evolutionHtml}
+    ${subsHtml}
+    ${findingsHtml}
+    ${anomalyHtml}
+    ${flaggedHtml}
+    ${prioritiesHtml}
   `;
 }
 
@@ -1512,7 +1775,7 @@ function renderAnalysisPanel() {
 // Priorities panel
 // ────────────────────────────────────────────────────────────────────
 function renderPrioritiesPanel() {
-  const priorities = state.data?.priorities ?? [];
+  const priorities = state.data?.insights?.priorities ?? [];
   if (!priorities.length) {
     el('priorities-panel').innerHTML = '';
     return;
