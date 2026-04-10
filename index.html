@@ -319,6 +319,17 @@
 
     /* ── Transactions table ─────────────────────────────────────── */
     .tx-table-wrap { overflow-x: auto; }
+    .tx-desc-input {
+      border: none;
+      background: transparent;
+      color: var(--text2);
+      font-size: .85rem;
+      font-family: inherit;
+      width: 100%;
+      outline: none;
+      padding: 0;
+    }
+    .tx-desc-input:focus { border-bottom: 1px solid var(--accent); color: var(--text); }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -541,6 +552,25 @@
     }
     @media (max-width: 600px) {
       .pie-chart-wrap { flex-direction: column; align-items: flex-start; }
+
+      /* Merchant rows: wrap so name is always visible on mobile */
+      .merchant-row {
+        flex-wrap: wrap;
+        gap: .4rem .75rem;
+      }
+      .merchant-row .m-name {
+        width: 100%;
+        flex: none;
+        min-width: 0;
+      }
+      .merchant-row .m-right {
+        flex-shrink: 1;
+        flex-wrap: wrap;
+        gap: .4rem .6rem;
+      }
+      .merchant-category-select {
+        max-width: 180px;
+      }
     }
 
     /* ── Tab bar ────────────────────────────────────────────────── */
@@ -831,7 +861,8 @@ const EDITS_GIST_ID = '565438afdc33a431fedd9067ea668c51';
 const state = {
   token: null,
   data: null,
-  edits: {},  // { "2026-01|Apple": "Subscrições", ... }
+  edits: {},         // { "2026-01|Apple": "Subscrições", ... }
+  descriptions: {},  // { "2026-01-15|Glovo|-12.50": "Jantar com a Sofia", ... }
   activeMonth: 'Todos',
   activeTab: 'gastos',  // 'gastos' | 'analise'
   view: 'categories',   // 'categories' | 'all-merchants' | 'merchants' | 'transactions'
@@ -984,7 +1015,7 @@ async function saveEditToGist(month, merchant, newCategory) {
   const key = getEditKey(month, merchant);
   state.edits[key] = newCategory;
 
-  const payload = { edits: state.edits };
+  const payload = { edits: state.edits, descriptions: state.descriptions };
   const headers = {
     "Authorization": `token ${state.token}`,
     "Accept": "application/vnd.github+json",
@@ -1005,6 +1036,30 @@ async function saveEditToGist(month, merchant, newCategory) {
     if (!res.ok) console.error("Failed to save edit:", res.status);
   } catch (err) {
     console.error("Error saving edit:", err);
+  }
+}
+
+function getTxKey(tx) {
+  return `${tx.date}|${tx.description}|${tx.amount}`;
+}
+
+async function saveTxDescriptionToGist(tx, description) {
+  const key = getTxKey(tx);
+  if (description.trim()) {
+    state.descriptions[key] = description.trim();
+  } else {
+    delete state.descriptions[key];
+  }
+  const payload = { edits: state.edits, descriptions: state.descriptions };
+  try {
+    const res = await fetch(`https://api.github.com/gists/${EDITS_GIST_ID}`, {
+      method: 'PATCH',
+      headers: { 'Authorization': `token ${state.token}`, 'Accept': 'application/vnd.github+json' },
+      body: JSON.stringify({ files: { 'category_edits.json': { content: JSON.stringify(payload, null, 2) } } })
+    });
+    if (!res.ok) console.error('Failed to save description:', res.status);
+  } catch (err) {
+    console.error('Error saving description:', err);
   }
 }
 
@@ -1154,6 +1209,7 @@ async function loadData() {
         if (editsContent) {
           const editsData = JSON.parse(editsContent);
           state.edits = editsData.edits ?? {};
+          state.descriptions = editsData.descriptions ?? {};
         }
       }
     } catch (err) {
@@ -1505,11 +1561,17 @@ function renderTransactions() {
     const amtClass = tx.is_refund ? 'amount-pos' : 'amount-neg';
     const refundBadge = tx.is_refund ? '<span class="refund-badge">reembolso</span>' : '';
     const rowClass = tx.is_refund ? ' class="is-refund"' : '';
+    const savedDesc = esc(state.descriptions[getTxKey(tx)] ?? '');
     return `
       <tr${rowClass}>
         <td class="tx-date">${formatDate(tx.date)}</td>
         <td>${esc(tx.description)}${refundBadge}</td>
-        <td style="color:var(--text2);font-size:.85rem"></td>
+        <td><input type="text" class="tx-desc-input"
+          data-txdate="${esc(tx.date)}"
+          data-txdesc="${esc(tx.description)}"
+          data-txamount="${tx.amount}"
+          value="${savedDesc}"
+          placeholder="Nota…" /></td>
         <td style="text-align:right"><span class="${amtClass}">${formatEuro(tx.amount)}</span></td>
       </tr>`;
   }).join('');
@@ -1537,6 +1599,15 @@ function renderTransactions() {
         <tbody>${rows || '<tr><td colspan="4" style="color:var(--text2);padding:.75rem">Sem transações.</td></tr>'}</tbody>
       </table>
     </div>`;
+
+  view.querySelector('.tx-table-wrap table')?.addEventListener('blur', e => {
+    if (!e.target.classList.contains('tx-desc-input')) return;
+    const t = e.target;
+    saveTxDescriptionToGist(
+      { date: t.dataset.txdate, description: t.dataset.txdesc, amount: parseFloat(t.dataset.txamount) },
+      t.value
+    );
+  }, true);
 }
 
 // ────────────────────────────────────────────────────────────────────
