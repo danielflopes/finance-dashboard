@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Finanças</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <style>
     /* ── Palette ───────────────────────────────────────────────── */
     :root {
@@ -1734,24 +1735,30 @@ function renderAnalysisPanel() {
       const names = ['','Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
       return names[parseInt(mo)] ?? m;
     };
-    const evRows = cats.map(cat => {
-      const vals = ev.categories[cat];
-      return `<tr>
-        <td>${esc(catLabel(cat))}</td>
-        ${vals.map(v => `<td class="num" style="color:var(--text2)">${v ? _formatEuroSimple(Math.abs(v)) : '—'}</td>`).join('')}
-      </tr>`;
-    }).join('');
+    const CHART_COLORS = [
+      '#4f46e5','#16a34a','#d97706','#e11d48','#0891b2',
+      '#7c3aed','#059669','#f59e0b','#db2777','#0284c7',
+      '#6d28d9','#10b981','#b45309','#be185d','#0369a1',
+    ];
+    const datasets = cats.map((cat, i) => ({
+      label: catLabel(cat),
+      data: ev.categories[cat].map(v => v ? Math.abs(v) : null),
+      borderColor: CHART_COLORS[i % CHART_COLORS.length],
+      backgroundColor: CHART_COLORS[i % CHART_COLORS.length] + '22',
+      borderWidth: 2,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      tension: 0.3,
+      spanGaps: true,
+    }));
+    const chartData = JSON.stringify({ labels: months.map(formatMonthLabel), datasets });
     const commentary = (ev.commentary ?? []).map(c => `<li>${inlineToHtml(c)}</li>`).join('');
     evolutionHtml = `
       <div class="analysis-section">
         <h2>Evolução mensal</h2>
-        <table class="evolution-table">
-          <thead><tr>
-            <th>Categoria</th>
-            ${months.map(m => `<th style="text-align:right">${formatMonthLabel(m)}</th>`).join('')}
-          </tr></thead>
-          <tbody>${evRows}</tbody>
-        </table>
+        <div style="position:relative;height:340px;margin-bottom:1rem">
+          <canvas data-evo-chart="${esc(chartData)}"></canvas>
+        </div>
         ${commentary ? `<ul class="commentary-list">${commentary}</ul>` : ''}
       </div>`;
   }
@@ -1840,6 +1847,43 @@ function renderAnalysisPanel() {
     ${flaggedHtml}
     ${prioritiesHtml}
   `;
+  initEvoCharts();
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Evolution chart init (runs after innerHTML is set)
+// ────────────────────────────────────────────────────────────────────
+function initEvoCharts() {
+  if (typeof Chart === 'undefined') return;
+  document.querySelectorAll('canvas[data-evo-chart]').forEach(canvas => {
+    if (canvas._chartInstance) canvas._chartInstance.destroy();
+    const data = JSON.parse(canvas.getAttribute('data-evo-chart'));
+    canvas._chartInstance = new Chart(canvas, {
+      type: 'line',
+      data,
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { position: 'bottom', labels: { boxWidth: 12, padding: 16, font: { size: 12 } } },
+          tooltip: {
+            callbacks: {
+              label: ctx => ' ' + ctx.dataset.label + ': ' + (ctx.parsed.y != null ? ctx.parsed.y.toFixed(2).replace('.', ',') + ' €' : '—'),
+            }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 12 } } },
+          y: {
+            beginAtZero: true,
+            ticks: { font: { size: 11 }, callback: v => v.toFixed(0) + ' €' },
+            grid: { color: 'rgba(0,0,0,.06)' },
+          }
+        }
+      }
+    });
+  });
 }
 
 // ────────────────────────────────────────────────────────────────────
