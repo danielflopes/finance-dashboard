@@ -669,6 +669,20 @@
     .flag-card-title { font-weight: 600; margin-bottom: .2rem; }
     .flag-card-body { color: var(--text2); line-height: 1.5; }
 
+    /* ── Tab date bars ───────────────────────────────────────────── */
+    #gastos-date-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: .45rem 1.5rem;
+      font-size: .78rem;
+      color: var(--text2);
+    }
+    .analysis-date-bar {
+      font-size: .78rem;
+      color: var(--text2);
+      margin-bottom: 1.25rem;
+    }
+
     /* ── Rich analysis report ────────────────────────────────────── */
     .analysis-header {
       background: var(--surface);
@@ -830,6 +844,8 @@
   </header>
 
   <nav id="tab-bar"></nav>
+
+  <div id="gastos-date-bar" style="display:none"></div>
 
   <nav id="month-filter"></nav>
 
@@ -1001,6 +1017,12 @@ function formatDate(iso) {
 
 function formatMonth(key) {
   return state.data?.period?.month_labels?.[key] ?? key;
+}
+
+function formatDatePt(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 function getEditKey(month, merchant) {
@@ -1249,6 +1271,13 @@ function render() {
   const isGastos = state.activeTab === 'gastos';
   el('month-filter').style.display = isGastos ? '' : 'none';
   el('app-body').style.display = isGastos ? '' : 'none';
+  const gastosBar = el('gastos-date-bar');
+  if (isGastos && state.data?.last_updated) {
+    gastosBar.style.display = '';
+    gastosBar.textContent = 'Última atualização: ' + formatDatePt(state.data.last_updated);
+  } else {
+    gastosBar.style.display = 'none';
+  }
   if (isGastos) {
     el('analysis-panel').classList.remove('visible');
     renderMonthFilter();
@@ -1683,6 +1712,11 @@ function renderAnalysisPanel() {
   const verdictClass = v => v === 'Keep' ? 'verdict-keep' : v === 'Potentially unused' ? 'verdict-unused' : 'verdict-review';
   const verdictLabel = v => v === 'Keep' ? 'Manter' : v === 'Potentially unused' ? 'Não usado?' : 'Rever';
 
+  // ── Analysis date ───────────────────────────────────────────────
+  const analysisDateHtml = ins.generated_at
+    ? `<div class="analysis-date-bar">Análise feita em ${formatDatePt(ins.generated_at)}</div>`
+    : '';
+
   // ── Header ──────────────────────────────────────────────────────
   const p = ins.period ?? {};
   const headerHtml = p.total_spent ? `
@@ -1838,6 +1872,7 @@ function renderAnalysisPanel() {
     </div>` : '';
 
   el('analysis-panel').innerHTML = `
+    ${analysisDateHtml}
     ${headerHtml}
     ${overviewHtml}
     ${evolutionHtml}
