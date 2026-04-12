@@ -1719,15 +1719,7 @@ function renderAnalysisPanel() {
 
   // ── Header ──────────────────────────────────────────────────────
   const p = ins.period ?? {};
-  const headerHtml = p.total_spent ? `
-    <div class="analysis-header">
-      <div class="meta">
-        ${p.from ? `${p.from} – ${p.to}` : ''}
-        ${p.total_spent ? ` · Total gasto: <strong>${_formatEuroSimple(Math.abs(p.total_spent))}</strong>` : ''}
-        ${p.avg_monthly ? ` · Média/mês: <strong>${_formatEuroSimple(Math.abs(p.avg_monthly))}</strong>` : ''}
-      </div>
-      ${p.top_takeaway ? `<div class="takeaway">${inlineToHtml(p.top_takeaway)}</div>` : ''}
-    </div>` : '';
+  const headerHtml = '';
 
   // ── Spending overview table ──────────────────────────────────────
   const overviewRows = (ins.spending_overview ?? []).map(o => {
@@ -1867,10 +1859,10 @@ function renderAnalysisPanel() {
     ${headerHtml}
     ${overviewHtml}
     ${evolutionHtml}
-    ${subsHtml}
-    ${findingsHtml}
     ${flaggedHtml}
+    ${subsHtml}
     ${prioritiesHtml}
+    ${findingsHtml}
   `;
   initEvoCharts();
 }
